@@ -197,39 +197,54 @@ const ToastContext = React.createContext(null);
 
 function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const dismiss = useCallback((id) => {
+    setToasts(t => t.filter(x => x.id !== id));
+  }, []);
   const addToast = useCallback((msg, type = 'info') => {
     const id = Date.now() + Math.random();
     setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
+    // Errors stay until manually dismissed; others auto-dismiss after 4s
+    if (type !== 'error') {
+      setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000);
+    }
   }, []);
   return (
     <ToastContext.Provider value={addToast}>
       {children}
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>
   );
 }
 
-function ToastContainer({ toasts }) {
+function ToastContainer({ toasts, onDismiss }) {
   const COLOR = { success: '#22c55e', error: '#ef4444', info: '#6366f1' };
   return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+      display: 'flex', flexDirection: 'column', gap: 10,
+      maxWidth: 400, width: 'calc(100vw - 48px)',
+    }}>
       {toasts.map(t => (
         <div key={t.id} style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'flex-start', gap: 10,
           background: '#1e293b', color: '#f1f5f9',
           border: `1px solid ${COLOR[t.type]}`,
           borderLeft: `4px solid ${COLOR[t.type]}`,
-          borderRadius: 8, padding: '10px 16px',
-          fontSize: 14, fontFamily: 'DM Sans, sans-serif',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          borderRadius: 8, padding: '12px 14px',
+          fontSize: 13, fontFamily: 'DM Sans, sans-serif',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           animation: 'slideIn 200ms ease',
-          maxWidth: 340,
+          wordBreak: 'break-word',
         }}>
-          <span style={{ color: COLOR[t.type], fontSize: 16 }}>
+          <span style={{ color: COLOR[t.type], fontSize: 16, flexShrink: 0, marginTop: 1 }}>
             {t.type === 'success' ? '✓' : t.type === 'error' ? '✕' : 'ℹ'}
           </span>
-          {t.msg}
+          <span style={{ flex: 1, lineHeight: 1.5 }}>{t.msg}</span>
+          <button onClick={() => onDismiss(t.id)} style={{
+            background: 'none', border: 'none', color: '#94a3b8',
+            cursor: 'pointer', fontSize: 16, padding: '0 0 0 4px',
+            flexShrink: 0, lineHeight: 1,
+          }}>×</button>
         </div>
       ))}
     </div>
@@ -1084,13 +1099,13 @@ function StepParams({ state, dispatch }) {
     toast('Training started...', 'info');
     try {
       const body = {
-        file_id:  data.fileId,
-        model_id: model.id,
-        features: state.features.inputs,
-        target:   state.features.target,
+        file_id:         data.fileId,
+        model_type:      model.id,
+        feature_columns: state.features.inputs,
+        target_column:   state.features.target,
         params,
-        test_size: split.testSize,
-        cv_folds:  split.useCv ? split.cvFolds : null,
+        test_size:   split.testSize,
+        cv_folds:    split.useCv ? split.cvFolds : null,
         date_column: state.features.dateColumn || null,
       };
       const res = await fetch('http://localhost:8000/train', {
