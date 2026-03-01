@@ -73,19 +73,19 @@ QWidget {{
     background-color: transparent;
     color: {C['text']};
     font-family: Consolas, 'Courier New', monospace;
-    font-size: 13px;
+    font-size: 16px;
 }}
 QLabel {{
     color: {C['text']};
     background: transparent;
 }}
 QLabel#heading {{
-    font-size: 20px;
+    font-size: 26px;
     font-weight: bold;
     color: {C['cyan']};
 }}
 QLabel#subheading {{
-    font-size: 13px;
+    font-size: 16px;
     color: {C['muted']};
 }}
 QLabel#metric {{
@@ -107,17 +107,18 @@ QLabel#neon {{
 }}
 QPushButton {{
     background-color: {C['panel']};
-    color: {C['cyan']};
+    color: #e0e0ff;
     border: 1px solid {C['border']};
     border-radius: 6px;
-    padding: 8px 20px;
-    font-size: 13px;
+    padding: 12px 28px;
+    font-size: 16px;
     font-weight: bold;
     font-family: Consolas, monospace;
 }}
 QPushButton:hover {{
     border: 1px solid {C['cyan']};
     background-color: {C['card']};
+    color: #e0e0ff;
 }}
 QPushButton:pressed {{
     background-color: {C['cyan']};
@@ -131,16 +132,18 @@ QPushButton#primary {{
     background-color: {C['cyan']};
     color: {C['bg']};
     border: none;
-    padding: 12px 32px;
-    font-size: 15px;
+    padding: 16px 44px;
+    font-size: 19px;
     font-weight: bold;
     border-radius: 8px;
 }}
 QPushButton#primary:hover {{
     background-color: #33ffe0;
+    color: {C['bg']};
 }}
 QPushButton#primary:pressed {{
     background-color: #00ccaa;
+    color: {C['bg']};
 }}
 QPushButton#primary:disabled {{
     background-color: {C['dim']};
@@ -158,14 +161,15 @@ QPushButton#preset {{
     padding: 6px 14px;
     font-size: 11px;
     border-radius: 4px;
+    color: #e0e0ff;
 }}
 QPushButton#step_btn {{
     background-color: transparent;
     border: none;
-    color: {C['muted']};
+    color: #a0a0cc;
     text-align: left;
-    padding: 12px 18px;
-    font-size: 13px;
+    padding: 16px 22px;
+    font-size: 16px;
     border-left: 3px solid transparent;
     border-radius: 0;
 }}
@@ -178,8 +182,8 @@ QPushButton#step_active {{
     border: none;
     color: {C['cyan']};
     text-align: left;
-    padding: 12px 18px;
-    font-size: 13px;
+    padding: 16px 22px;
+    font-size: 16px;
     border-left: 3px solid {C['cyan']};
     border-radius: 0;
     font-weight: bold;
@@ -189,10 +193,10 @@ QComboBox {{
     color: {C['text']};
     border: 1px solid {C['input_border']};
     border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 13px;
+    padding: 8px 12px;
+    font-size: 16px;
     font-family: Consolas, monospace;
-    min-height: 28px;
+    min-height: 38px;
 }}
 QComboBox:focus {{
     border: 1px solid {C['cyan']};
@@ -214,9 +218,10 @@ QSpinBox, QDoubleSpinBox {{
     color: {C['text']};
     border: 1px solid {C['input_border']};
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     font-family: Consolas, monospace;
-    min-height: 28px;
+    font-size: 16px;
+    min-height: 38px;
 }}
 QSpinBox:focus, QDoubleSpinBox:focus {{
     border: 1px solid {C['cyan']};
@@ -240,7 +245,7 @@ QSlider::sub-page:horizontal {{
 QCheckBox {{
     color: {C['text']};
     spacing: 8px;
-    font-size: 13px;
+    font-size: 16px;
 }}
 QCheckBox::indicator {{
     width: 18px;
@@ -262,6 +267,7 @@ QGroupBox {{
     margin-top: 16px;
     padding: 20px 16px 12px 16px;
     font-weight: bold;
+    font-size: 15px;
     color: {C['cyan']};
 }}
 QGroupBox::title {{
@@ -269,7 +275,7 @@ QGroupBox::title {{
     subcontrol-position: top left;
     padding: 0 8px;
     color: {C['cyan']};
-    font-size: 13px;
+    font-size: 15px;
 }}
 QTableWidget {{
     background-color: {C['panel']};
@@ -279,7 +285,7 @@ QTableWidget {{
     gridline-color: {C['border']};
     color: {C['text']};
     font-family: Consolas, monospace;
-    font-size: 12px;
+    font-size: 14px;
     selection-background-color: {C['card_hover']};
     selection-color: {C['cyan']};
 }}
@@ -307,9 +313,9 @@ QTabBar::tab {{
     color: {C['muted']};
     border: 1px solid {C['border']};
     border-bottom: none;
-    padding: 8px 18px;
+    padding: 12px 24px;
     font-weight: bold;
-    font-size: 12px;
+    font-size: 15px;
     margin-right: 2px;
     border-radius: 6px 6px 0 0;
 }}
@@ -381,7 +387,7 @@ QStatusBar {{
     background: {C['panel']};
     color: {C['muted']};
     border-top: 1px solid {C['border']};
-    font-size: 12px;
+    font-size: 14px;
 }}
 QFrame#card {{
     background-color: {C['card']};
@@ -532,14 +538,14 @@ def make_selected_card(parent=None):
     frame.setObjectName('card_selected')
     return frame
 
-def neon_label(text, color=None, size=13, bold=False, parent=None):
+def neon_label(text, color=None, size=16, bold=False, parent=None):
     lbl = QLabel(text, parent)
     c = color or C['cyan']
     weight = 'bold' if bold else 'normal'
     lbl.setStyleSheet(f"color: {c}; font-size: {size}px; font-weight: {weight}; background: transparent;")
     return lbl
 
-def muted_label(text, size=12, parent=None):
+def muted_label(text, size=15, parent=None):
     lbl = QLabel(text, parent)
     lbl.setStyleSheet(f"color: {C['muted']}; font-size: {size}px; background: transparent;")
     return lbl
@@ -611,6 +617,128 @@ class CyberChart(FigureCanvas):
 
 
 # ═══════════════════════════════════════════════════════════
+# ANIMATED CYBERPUNK CORNER DECORATIONS
+# ═══════════════════════════════════════════════════════════
+class CyberpunkCorners(QWidget):
+    """Animated neon corner decorations drawn with QPainter."""
+
+    GLYPHS = ['◈', '⬡', '◉', '▣', '◫', '⬢', '◈', '⟁', '⬟', '◧']
+    CIRCUIT_CHARS = ['┤', '├', '┬', '┴', '┼', '╔', '╗', '╚', '╝', '═', '║']
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)  # Don't block clicks
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self.setStyleSheet("background: transparent;")
+
+        self.tick = 0
+        self.glyph_states = []
+        for i in range(8):
+            self.glyph_states.append({
+                'char': self.GLYPHS[i % len(self.GLYPHS)],
+                'alpha': float(i * 30 % 200 + 55),
+                'pulse_offset': i * 0.4,
+            })
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._tick)
+        self.timer.start(60)  # ~16fps
+
+    def _tick(self):
+        self.tick += 1
+        # Cycle glyphs occasionally
+        if self.tick % 45 == 0:
+            import random
+            idx = random.randint(0, len(self.glyph_states) - 1)
+            self.glyph_states[idx]['char'] = self.GLYPHS[random.randint(0, len(self.GLYPHS) - 1)]
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        import math
+        w, h = self.width(), self.height()
+        t = self.tick
+
+        # Pulse function
+        def pulse(offset=0, speed=1):
+            return 0.5 + 0.5 * math.sin((t * speed * 0.05) + offset)
+
+        def draw_corner(cx, cy, flip_x, flip_y, glyph_list):
+            """Draw a neon corner bracket with glyphs."""
+            sx = 1 if not flip_x else -1
+            sy = 1 if not flip_y else -1
+            size = 80  # bracket size
+
+            # Corner bracket lines
+            alpha_base = int(120 + 80 * pulse(cx * 0.01))
+
+            # Outer L bracket
+            pen = QPen(QColor(0, 255, 213, alpha_base))
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.drawLine(cx, cy, cx + sx * size, cy)
+            painter.drawLine(cx, cy, cx, cy + sy * size)
+
+            # Inner corner accent
+            pen2 = QPen(QColor(255, 0, 110, int(alpha_base * 0.6)))
+            pen2.setWidth(1)
+            painter.setPen(pen2)
+            offset = 6
+            painter.drawLine(cx + sx * offset, cy + sy * offset, cx + sx * (size - 20), cy + sy * offset)
+            painter.drawLine(cx + sx * offset, cy + sy * offset, cx + sx * offset, cy + sy * (size - 20))
+
+            # Glyphs along the bracket
+            font = QFont("Consolas", 13)
+            font.setBold(True)
+            painter.setFont(font)
+
+            for i, gs in enumerate(glyph_list):
+                angle_alpha = int(80 + 120 * pulse(gs['pulse_offset'], 0.8))
+                painter.setPen(QColor(0, 255, 213, angle_alpha))
+                gx = cx + sx * (18 + i * 22)
+                gy = cy + sy * 22
+                painter.drawText(gx - 8, gy + 6, gs['char'])
+
+                # Vertical glyph
+                painter.setPen(QColor(180, 41, 221, int(angle_alpha * 0.7)))
+                gx2 = cx + sx * 22
+                gy2 = cy + sy * (18 + i * 22)
+                painter.drawText(gx2 - 8, gy2 + 6, self.CIRCUIT_CHARS[i % len(self.CIRCUIT_CHARS)])
+
+            # Dot at corner tip
+            dot_alpha = int(180 + 75 * pulse(cx * 0.02, 1.5))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(0, 255, 213, dot_alpha))
+            painter.drawEllipse(cx - sx * 2, cy - sy * 2, 5, 5)
+
+        # Scanline effect (subtle horizontal lines across full width)
+        scan_alpha = int(8 + 6 * pulse(0, 0.3))
+        pen_scan = QPen(QColor(0, 255, 213, scan_alpha))
+        pen_scan.setWidth(1)
+        painter.setPen(pen_scan)
+        scan_y = (t * 2) % h
+        for dy in range(0, h, 6):
+            y = (scan_y + dy) % h
+            painter.drawLine(0, y, w, y)
+
+        gs = self.glyph_states
+        margin = 16
+
+        # Top-left corner
+        draw_corner(margin, margin, False, False, gs[0:3])
+        # Top-right corner
+        draw_corner(w - margin, margin, True, False, gs[2:5])
+        # Bottom-left corner
+        draw_corner(margin, h - margin, False, True, gs[4:7])
+        # Bottom-right corner
+        draw_corner(w - margin, h - margin, True, True, gs[5:8])
+
+        painter.end()
+
+
+# ═══════════════════════════════════════════════════════════
 # STEP 1 — IMPORT DATA
 # ═══════════════════════════════════════════════════════════
 class StepImport(QWidget):
@@ -618,7 +746,36 @@ class StepImport(QWidget):
         super().__init__(parent)
         self.state = state
         self.worker = None
+        self.setAcceptDrops(True)
         self.init_ui()
+
+    def _drop_default_style(self):
+        return (
+            f"QFrame {{ border: 2px dashed {C['dim']}; border-radius: 16px; "
+            f"background: {C['panel']}; min-height: 220px; }} "
+            f"QFrame:hover {{ border-color: {C['cyan']}; background: {C['card']}; }}"
+        )
+
+    def _drop_hover_style(self):
+        return (
+            f"QFrame {{ border: 2px solid {C['cyan']}; border-radius: 16px; "
+            f"background: {C['card_hover']}; min-height: 220px; }}"
+        )
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.drop_frame.setStyleSheet(self._drop_hover_style())
+
+    def dragLeaveEvent(self, event):
+        self.drop_frame.setStyleSheet(self._drop_default_style())
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            path = urls[0].toLocalFile()
+            self.drop_frame.setStyleSheet(self._drop_default_style())
+            self.upload_file(path)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -629,39 +786,64 @@ class StepImport(QWidget):
         layout.addWidget(muted_label("Upload your dataset to initialize the pipeline."))
         layout.addSpacing(8)
 
-        # Drop zone
-        drop_frame = QFrame()
-        drop_frame.setStyleSheet(f"""
-            QFrame {{
-                border: 2px dashed {C['dim']};
-                border-radius: 12px;
-                background: {C['panel']};
-                min-height: 160px;
-            }}
-            QFrame:hover {{
-                border-color: {C['cyan']};
-                background: {C['card']};
-            }}
-        """)
-        drop_layout = QVBoxLayout(drop_frame)
+        # Drop zone — stored as class attribute for drag/drop style updates
+        self.drop_frame = QFrame()
+        self.drop_frame.setStyleSheet(self._drop_default_style())
+        self.drop_frame.setCursor(Qt.PointingHandCursor)
+        self.drop_frame.mousePressEvent = lambda event: self.browse_file()
+
+        drop_layout = QVBoxLayout(self.drop_frame)
         drop_layout.setAlignment(Qt.AlignCenter)
-        drop_layout.setSpacing(12)
+        drop_layout.setSpacing(14)
 
         icon_lbl = QLabel("📂")
-        icon_lbl.setStyleSheet("font-size: 48px; background: transparent;")
+        icon_lbl.setStyleSheet("font-size: 64px; background: transparent;")
         icon_lbl.setAlignment(Qt.AlignCenter)
         drop_layout.addWidget(icon_lbl)
 
-        drop_layout.addWidget(neon_label("Select a file to upload", C['text'], 15, True))
-        drop_layout.addWidget(muted_label("CSV  ·  Excel  ·  Parquet  ·  JSON  ·  TXT", 12))
+        drop_layout.addWidget(neon_label("Drag & Drop your file here", C['text'], 18, True))
+        drop_layout.addWidget(muted_label("or click the button below", 15))
 
-        self.btn_browse = QPushButton("⚡  BROWSE FILES")
+        # Format chips row
+        chips_row = QHBoxLayout()
+        chips_row.setAlignment(Qt.AlignCenter)
+        chips_row.setSpacing(8)
+        format_chips = [
+            ('CSV', C['cyan']),
+            ('Excel', C['green']),
+            ('Parquet', C['blue']),
+            ('JSON', C['amber']),
+            ('TXT', C['purple']),
+        ]
+        for fmt, color in format_chips:
+            chip = QLabel(fmt)
+            chip.setStyleSheet(f"""
+                background-color: {color}22;
+                color: {color};
+                border: 1px solid {color}55;
+                border-radius: 4px;
+                padding: 3px 10px;
+                font-size: 13px;
+                font-weight: bold;
+            """)
+            chip.setFixedHeight(26)
+            chips_row.addWidget(chip)
+        drop_layout.addLayout(chips_row)
+
+        drop_layout.addSpacing(6)
+
+        self.btn_browse = QPushButton("📂  BROWSE FILES")
         self.btn_browse.setObjectName('primary')
         self.btn_browse.setCursor(Qt.PointingHandCursor)
         self.btn_browse.clicked.connect(self.browse_file)
+        # Prevent the browse button click from also triggering the frame click
+        self.btn_browse.mousePressEvent = lambda event: (
+            event.accept(),
+            self.browse_file()
+        )
         drop_layout.addWidget(self.btn_browse, alignment=Qt.AlignCenter)
 
-        layout.addWidget(drop_frame)
+        layout.addWidget(self.drop_frame)
 
         # Progress bar (hidden by default)
         self.progress = QProgressBar()
@@ -749,7 +931,7 @@ class StepImport(QWidget):
         self.results_layout.addWidget(card)
 
         # Column cards grid
-        self.results_layout.addWidget(neon_label(f"Columns ({len(s['columns'])})", C['cyan'], 14, True))
+        self.results_layout.addWidget(neon_label(f"Columns ({len(s['columns'])})", C['cyan'], 17, True))
 
         TYPE_COLORS = {'numeric': C['blue'], 'categorical': C['purple'], 'datetime': C['amber'], 'text': C['muted']}
         TYPE_ICONS = {'numeric': '🔢', 'categorical': '🔤', 'datetime': '📅', 'text': '📝'}
@@ -769,14 +951,15 @@ class StepImport(QWidget):
                     border-left: 3px solid {tcolor};
                     border-radius: 6px;
                     padding: 0;
+                    min-height: 100px;
                 }}
                 QFrame:hover {{ border-color: {tcolor}; }}
             """)
             cfl = QVBoxLayout(cframe)
-            cfl.setContentsMargins(12, 10, 12, 10)
+            cfl.setContentsMargins(12, 16, 12, 16)
             cfl.setSpacing(6)
 
-            cfl.addWidget(neon_label(cname, C['text'], 12, True))
+            cfl.addWidget(neon_label(cname, C['text'], 15, True))
 
             badge_row = QHBoxLayout()
             badge_row.addWidget(badge_label(f"{TYPE_ICONS.get(dtype, '')} {dtype}", tcolor))
@@ -784,7 +967,7 @@ class StepImport(QWidget):
             cfl.addLayout(badge_row)
 
             null_pct = f"{(col['null_count'] / max(s['shape'].get('rows', 1), 1) * 100):.1f}" if col.get('null_count') else '0.0'
-            cfl.addWidget(muted_label(f"{col.get('unique_count', '?')} unique  ·  {null_pct}% null", 10))
+            cfl.addWidget(muted_label(f"{col.get('unique_count', '?')} unique  ·  {null_pct}% null", 13))
 
             row, colp = divmod(i, 3)
             cols_grid.addWidget(cframe, row, colp)
@@ -795,7 +978,7 @@ class StepImport(QWidget):
 
         # Preview table
         if s['preview']:
-            self.results_layout.addWidget(neon_label("Data Preview (first 10 rows)", C['cyan'], 14, True))
+            self.results_layout.addWidget(neon_label("Data Preview (first 10 rows)", C['cyan'], 17, True))
             col_names = [c['name'] for c in s['columns']]
             table = QTableWidget(min(10, len(s['preview'])), len(col_names))
             table.setHorizontalHeaderLabels(col_names)
@@ -848,7 +1031,7 @@ class StepModel(QWidget):
         """)
         rec_layout = QHBoxLayout(self.rec_banner)
         rec_layout.setContentsMargins(14, 10, 14, 10)
-        self.rec_label = neon_label("⚡ Recommendation will appear after data upload", C['cyan'], 12)
+        self.rec_label = neon_label("⚡ Recommendation will appear after data upload", C['cyan'], 15)
         rec_layout.addWidget(self.rec_label)
         layout.addWidget(self.rec_banner)
 
@@ -877,7 +1060,7 @@ class StepModel(QWidget):
         mid = model['id']
         card = QFrame()
         card.setCursor(Qt.PointingHandCursor)
-        card.setFixedHeight(120)
+        card.setFixedHeight(140)
         card.setMinimumWidth(200)
 
         style_default = f"""
@@ -1005,7 +1188,7 @@ class StepFeatures(QWidget):
         btn_row.addStretch()
         left_layout.addLayout(btn_row)
 
-        left_layout.addWidget(neon_label("Feature Columns", C['cyan'], 13, True))
+        left_layout.addWidget(neon_label("Feature Columns", C['cyan'], 16, True))
 
         self.features_container = QVBoxLayout()
         self.features_container.setSpacing(4)
@@ -1017,15 +1200,15 @@ class StepFeatures(QWidget):
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(8, 0, 0, 0)
 
-        right_layout.addWidget(neon_label("Target Column", C['cyan'], 13, True))
-        right_layout.addWidget(muted_label("The variable you want to predict.", 11))
+        right_layout.addWidget(neon_label("Target Column", C['cyan'], 16, True))
+        right_layout.addWidget(muted_label("The variable you want to predict.", 14))
         self.target_combo = QComboBox()
         self.target_combo.currentTextChanged.connect(self._on_target_change)
         right_layout.addWidget(self.target_combo)
         right_layout.addSpacing(16)
 
-        right_layout.addWidget(neon_label("Date Column (optional)", C['cyan'], 13, True))
-        right_layout.addWidget(muted_label("For time series models.", 11))
+        right_layout.addWidget(neon_label("Date Column (optional)", C['cyan'], 16, True))
+        right_layout.addWidget(muted_label("For time series models.", 14))
         self.date_combo = QComboBox()
         self.date_combo.addItem("— None —")
         right_layout.addWidget(self.date_combo)
@@ -1118,7 +1301,7 @@ class StepParams(QWidget):
 
         # Presets row
         preset_row = QHBoxLayout()
-        preset_row.addWidget(muted_label("Quick Presets:", 12))
+        preset_row.addWidget(muted_label("Quick Presets:", 15))
         for name in ['Conservative', 'Balanced', 'Aggressive']:
             btn = QPushButton(name)
             btn.setObjectName('preset')
@@ -1146,11 +1329,11 @@ class StepParams(QWidget):
         self.split_slider.setTickInterval(5)
         self.split_slider.valueChanged.connect(self._update_split_label)
         split_h.addWidget(self.split_slider, 1)
-        self.split_label = neon_label("80% Train  /  20% Test", C['cyan'], 12, True)
+        self.split_label = neon_label("80% Train  /  20% Test", C['cyan'], 15, True)
         split_h.addWidget(self.split_label)
         split_layout.addLayout(split_h)
 
-        self.split_rows_label = muted_label("", 11)
+        self.split_rows_label = muted_label("", 14)
         split_layout.addWidget(self.split_rows_label)
         self._update_split_label(20)
 
@@ -1160,7 +1343,7 @@ class StepParams(QWidget):
         # Train button
         self.btn_train = QPushButton("⚡  TRAIN MODEL")
         self.btn_train.setObjectName('primary')
-        self.btn_train.setFixedHeight(48)
+        self.btn_train.setFixedHeight(56)
         self.btn_train.setCursor(Qt.PointingHandCursor)
         self.btn_train.clicked.connect(self.start_training)
         layout.addWidget(self.btn_train)
@@ -1169,7 +1352,7 @@ class StepParams(QWidget):
         self.train_progress = QProgressBar()
         self.train_progress.setRange(0, 0)
         self.train_progress.setVisible(False)
-        self.train_label = neon_label("Training in progress...", C['cyan'], 12)
+        self.train_label = neon_label("Training in progress...", C['cyan'], 15)
         self.train_label.setVisible(False)
         layout.addWidget(self.train_label)
         layout.addWidget(self.train_progress)
@@ -1214,7 +1397,7 @@ class StepParams(QWidget):
 
         params = DEFAULT_PARAMS.get(mid, {})
         if not params:
-            self.params_area.addWidget(muted_label("No hyperparameters for this model. Click Train to proceed.", 13))
+            self.params_area.addWidget(muted_label("No hyperparameters for this model. Click Train to proceed.", 16))
             return
 
         PARAM_TOOLTIPS = {
@@ -1291,7 +1474,7 @@ class StepParams(QWidget):
 
             lbl = QLabel(label_text)
             lbl.setToolTip(tooltip)
-            lbl.setStyleSheet(f"color: {C['text']}; font-weight: bold; font-size: 12px;")
+            lbl.setStyleSheet(f"color: {C['text']}; font-weight: bold; font-size: 15px;")
             grid.addWidget(lbl, row, 0)
 
             if key in PARAM_OPTIONS:
@@ -1447,7 +1630,7 @@ class StepResults(QWidget):
 
         r = self.state.get('results')
         if not r:
-            self.results_container.addWidget(muted_label("No results yet. Train a model first.", 14))
+            self.results_container.addWidget(muted_label("No results yet. Train a model first.", 17))
             return
 
         # Header
@@ -1499,16 +1682,16 @@ class StepResults(QWidget):
                     border: 1px solid {color}44;
                     border-top: 3px solid {color};
                     border-radius: 8px;
-                    min-width: 130px;
+                    min-width: 160px;
                 }}
             """)
             cl = QVBoxLayout(card)
             cl.setContentsMargins(14, 12, 14, 12)
             cl.setSpacing(6)
-            cl.addWidget(muted_label(label, 10))
+            cl.addWidget(muted_label(label, 13))
 
             val_label = QLabel(f"{val:.4f}" if isinstance(val, float) else str(val))
-            val_label.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold; font-family: Consolas, monospace;")
+            val_label.setStyleSheet(f"color: {color}; font-size: 30px; font-weight: bold; font-family: Consolas, monospace;")
             cl.addWidget(val_label)
 
             row_pos = col // 5
@@ -1683,7 +1866,18 @@ class HappyModelApp(QMainWindow):
         }
         self.current_step = 0
         self.init_ui()
+
+        # Animated corner overlay
+        self.corners = CyberpunkCorners(self)
+        self.corners.setGeometry(0, 0, self.width(), self.height())
+        self.corners.raise_()
+
         self.check_health()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'corners'):
+            self.corners.setGeometry(0, 0, self.width(), self.height())
 
     def init_ui(self):
         self.setWindowTitle("HappyModel — Cyberpunk ML Studio")
@@ -1698,7 +1892,7 @@ class HappyModelApp(QMainWindow):
 
         # ── SIDEBAR ──
         sidebar = QWidget()
-        sidebar.setFixedWidth(240)
+        sidebar.setFixedWidth(280)
         sidebar.setStyleSheet(f"""
             QWidget {{
                 background-color: {C['panel']};
@@ -1718,7 +1912,7 @@ class HappyModelApp(QMainWindow):
         logo = QLabel("HAPPY\nMODEL")
         logo.setStyleSheet(f"""
             color: {C['cyan']};
-            font-size: 22px;
+            font-size: 28px;
             font-weight: bold;
             font-family: Consolas, monospace;
             letter-spacing: 3px;
@@ -1789,13 +1983,31 @@ class HappyModelApp(QMainWindow):
         self.btn_back = QPushButton("← BACK")
         self.btn_back.setCursor(Qt.PointingHandCursor)
         self.btn_back.clicked.connect(self.go_back)
+        self.btn_back.setFixedHeight(48)
+        self.btn_back.setStyleSheet(f"""
+            QPushButton {{
+                font-size: 16px;
+                font-weight: bold;
+                color: #e0e0ff;
+                padding: 0 28px;
+            }}
+        """)
         self.btn_next = QPushButton("NEXT →")
         self.btn_next.setCursor(Qt.PointingHandCursor)
         self.btn_next.clicked.connect(self.go_next)
+        self.btn_next.setFixedHeight(48)
+        self.btn_next.setStyleSheet(f"""
+            QPushButton {{
+                font-size: 16px;
+                font-weight: bold;
+                color: #e0e0ff;
+                padding: 0 28px;
+            }}
+        """)
 
         bottom.addWidget(self.btn_back)
         bottom.addStretch()
-        step_indicator = neon_label("Step 1 of 5", C['muted'], 12)
+        step_indicator = neon_label("Step 1 of 5", C['muted'], 15)
         self.step_indicator = step_indicator
         bottom.addWidget(step_indicator)
         bottom.addStretch()
