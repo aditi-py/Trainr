@@ -377,7 +377,7 @@ function StepImport({ state, dispatch }) {
         fileId: json.file_id,
         fileName: file.name,
         columns: json.columns || [],
-        types: json.types || {},
+        types: json.inferred_types || {},
         preview: json.preview || [],
         shape: json.shape || {},
       }});
@@ -477,18 +477,17 @@ function StepImport({ state, dispatch }) {
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
               {data.columns.map(col => {
-                const dtype = data.types[col] || 'text';
+                const dtype = data.types[col.name] || 'text';
                 const meta  = TYPE_META[dtype] || TYPE_META.text;
-                const info  = data.preview.length > 0
-                  ? { nullPct: 0, unique: new Set(data.preview.map(r => r[col])).size }
-                  : { nullPct: 0, unique: '—' };
+                const nullPct = data.shape.rows > 0 ? ((col.null_count / data.shape.rows) * 100).toFixed(1) : 0;
+                const info = { nullPct, unique: col.unique_count ?? '—' };
                 return (
-                  <div key={col} style={{
+                  <div key={col.name} style={{
                     background: t.card, border: `1px solid ${t.border}`,
                     borderRadius: 8, padding: '12px 14px',
                     borderLeft: `3px solid ${meta.color}`,
                   }}>
-                    <p style={{ fontWeight: 600, fontSize: 13, color: t.text, marginBottom: 6, wordBreak: 'break-word' }}>{col}</p>
+                    <p style={{ fontWeight: 600, fontSize: 13, color: t.text, marginBottom: 6, wordBreak: 'break-word' }}>{col.name}</p>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <Badge color={meta.color}>{meta.icon} {meta.label}</Badge>
                     </div>
@@ -510,10 +509,10 @@ function StepImport({ state, dispatch }) {
                   <thead>
                     <tr style={{ background: dark ? '#0f172a' : '#f1f5f9' }}>
                       {data.columns.map(col => (
-                        <th key={col} style={{
+                        <th key={col.name} style={{
                           padding: '8px 12px', textAlign: 'left', whiteSpace: 'nowrap',
                           color: t.muted, fontWeight: 600, borderBottom: `1px solid ${t.border}`,
-                        }}>{col}</th>
+                        }}>{col.name}</th>
                       ))}
                     </tr>
                   </thead>
@@ -521,8 +520,8 @@ function StepImport({ state, dispatch }) {
                     {data.preview.slice(0, 10).map((row, i) => (
                       <tr key={i} style={{ background: i % 2 === 0 ? t.card : (dark ? '#162032' : '#f8fafc') }}>
                         {data.columns.map(col => (
-                          <td key={col} style={{ padding: '7px 12px', color: t.text, borderBottom: `1px solid ${t.border}33`, whiteSpace: 'nowrap' }}>
-                            {String(row[col] ?? '—')}
+                          <td key={col.name} style={{ padding: '7px 12px', color: t.text, borderBottom: `1px solid ${t.border}33`, whiteSpace: 'nowrap' }}>
+                            {String(row[col.name] ?? '—')}
                           </td>
                         ))}
                       </tr>
@@ -686,7 +685,7 @@ function StepFeatures({ state, dispatch }) {
     dispatch({ type: 'SET_FEATURES', payload: { inputs: next } });
   };
 
-  const numericCols = data.columns.filter(c => data.types[c] === 'numeric');
+  const numericCols = data.columns.filter(c => data.types[c.name] === 'numeric').map(c => c.name);
   const correlations = useMemo(() => {
     if (!features.target || data.preview.length === 0) return {};
     const corrs = {};
@@ -756,12 +755,12 @@ function StepFeatures({ state, dispatch }) {
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto', paddingRight: 4 }}>
             {data.columns.map(col => {
-              const dtype = data.types[col] || 'text';
+              const dtype = data.types[col.name] || 'text';
               const meta  = TYPE_META[dtype] || TYPE_META.text;
-              const checked = features.inputs.includes(col);
-              const isTarget = col === features.target;
+              const checked = features.inputs.includes(col.name);
+              const isTarget = col.name === features.target;
               return (
-                <label key={col} style={{
+                <label key={col.name} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '8px 12px', borderRadius: 8,
                   background: checked ? `${t.accent}0d` : t.card,
@@ -771,15 +770,15 @@ function StepFeatures({ state, dispatch }) {
                   transition: t.trans,
                 }}>
                   <input type="checkbox" checked={checked} disabled={isTarget}
-                    onChange={() => toggleInput(col)} />
-                  <span style={{ flex: 1, fontSize: 13, color: t.text, fontWeight: checked ? 600 : 400 }}>{col}</span>
+                    onChange={() => toggleInput(col.name)} />
+                  <span style={{ flex: 1, fontSize: 13, color: t.text, fontWeight: checked ? 600 : 400 }}>{col.name}</span>
                   <Badge color={meta.color}>{meta.icon}</Badge>
-                  {Object.hasOwn(correlations, col) && (
+                  {Object.hasOwn(correlations, col.name) && (
                     <span style={{
                       fontFamily: 'DM Mono, monospace', fontSize: 11,
-                      color: corrColor(correlations[col]),
+                      color: corrColor(correlations[col.name]),
                       fontWeight: 600,
-                    }}>{correlations[col].toFixed(2)}</span>
+                    }}>{correlations[col.name].toFixed(2)}</span>
                   )}
                 </label>
               );
@@ -787,7 +786,7 @@ function StepFeatures({ state, dispatch }) {
           </div>
           <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
             <Button dark={dark} size="sm" variant="secondary"
-              onClick={() => dispatch({ type: 'SET_FEATURES', payload: { inputs: data.columns.filter(c => c !== features.target) } })}>
+              onClick={() => dispatch({ type: 'SET_FEATURES', payload: { inputs: data.columns.map(c => c.name).filter(n => n !== features.target) } })}>
               Select All
             </Button>
             <Button dark={dark} size="sm" variant="ghost"
@@ -811,7 +810,7 @@ function StepFeatures({ state, dispatch }) {
                 fontSize: 14, transition: t.trans,
               }}>
               <option value="">— Select target —</option>
-              {data.columns.map(c => <option key={c} value={c}>{c}</option>)}
+              {data.columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
           </div>
 
@@ -828,7 +827,7 @@ function StepFeatures({ state, dispatch }) {
                   fontSize: 14, transition: t.trans,
                 }}>
                 <option value="">— Select date column —</option>
-                {data.columns.filter(c => data.types[c] === 'datetime').map(c => <option key={c} value={c}>{c}</option>)}
+                {data.columns.filter(c => data.types[c.name] === 'datetime').map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
             </div>
           )}
