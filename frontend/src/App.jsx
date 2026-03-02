@@ -531,6 +531,19 @@ function StepImport({ state, dispatch }) {
   const fileRef = useRef();
 
   const FORMATS = ['CSV', 'Excel', 'Parquet', 'JSON', 'TXT'];
+  const FORMAT_ACCEPTS = {
+    CSV:     '.csv',
+    Excel:   '.xlsx,.xls',
+    Parquet: '.parquet',
+    JSON:    '.json',
+    TXT:     '.txt',
+  };
+
+  const openForFormat = (fmt) => {
+    fileRef.current.accept = FORMAT_ACCEPTS[fmt];
+    fileRef.current.value  = '';   // allow re-selecting same file
+    fileRef.current.click();
+  };
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -573,39 +586,51 @@ function StepImport({ state, dispatch }) {
         <p style={{ color: t.muted, fontSize: 14 }}>Upload your dataset to get started. Supports multiple formats.</p>
       </div>
 
-      {/* Drop Zone */}
+      {/* Drop Zone — drag & drop only */}
       <div
-        onClick={() => fileRef.current.click()}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         style={{
           border: `1px dashed ${dragging ? '#00ffd5' : '#00ffd533'}`,
-          borderRadius: 4, padding: '48px 32px',
+          borderRadius: 4, padding: '40px 32px',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
-          cursor: 'pointer', transition: t.trans,
+          cursor: 'default', transition: t.trans,
           background: dragging ? 'rgba(0,255,213,0.06)' : dark ? 'rgba(0,255,213,0.02)' : t.card,
           textAlign: 'center',
           boxShadow: dragging ? '0 0 24px rgba(0,255,213,0.2), inset 0 0 24px rgba(0,255,213,0.05)' : 'none',
         }}
       >
-        <span style={{ fontSize: 48 }}>📂</span>
+        <span style={{ fontSize: 44, filter: dragging ? 'drop-shadow(0 0 8px #00ffd5)' : 'none', transition: t.trans }}>📂</span>
         <div>
           <p style={{ color: t.text, fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
-            Drag & drop your file here, or click to browse
+            Drag & drop your file here
           </p>
-          <p style={{ color: t.muted, fontSize: 13 }}>Maximum file size: 500MB</p>
+          <p style={{ color: t.muted, fontSize: 13 }}>or click a format below to browse</p>
+          <p style={{ color: t.muted, fontSize: 12, marginTop: 4 }}>Maximum file size: 500MB</p>
         </div>
+
+        {/* Format chips — each opens a type-filtered file picker */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
           {FORMATS.map(f => (
-            <span key={f} style={{
-              padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-              background: `${t.accent}1a`, color: t.accent, border: `1px solid ${t.accent}33`,
-            }}>{f}</span>
+            <span key={f}
+              onClick={() => openForFormat(f)}
+              style={{
+                padding: '5px 14px', borderRadius: 2, fontSize: 12, fontWeight: 600,
+                background: `${t.accent}18`, color: t.accent,
+                border: `1px solid ${t.accent}55`,
+                cursor: 'pointer', letterSpacing: '0.4px',
+                fontFamily: 'Share Tech Mono, monospace',
+                transition: t.trans,
+                userSelect: 'none',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${t.accent}30`; e.currentTarget.style.boxShadow = `0 0 8px ${t.accent}44`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = `${t.accent}18`; e.currentTarget.style.boxShadow = 'none'; }}
+            >{f}</span>
           ))}
         </div>
+
         <input ref={fileRef} type="file" style={{ display: 'none' }}
-          accept=".csv,.xlsx,.xls,.parquet,.json,.txt"
           onChange={(e) => handleFile(e.target.files[0])} />
       </div>
 
@@ -1476,8 +1501,13 @@ function StepResults({ state, dispatch }) {
     const blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `${current.modelId}_results_${Date.now()}.json`;
-    a.click(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `${current.modelId}_results_${Date.now()}.json`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Results saved!', 'success');
   };
 
@@ -1606,8 +1636,13 @@ ${pca.length > 0 ? `<div class="card">
     const blob = new Blob([html], { type: 'text/html' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `happymodel_report_${current.modelId}_${Date.now()}.html`;
-    a.click(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `happymodel_report_${current.modelId}_${Date.now()}.html`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Report exported!', 'success');
   };
 
