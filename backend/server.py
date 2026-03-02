@@ -175,7 +175,7 @@ async def upload(file: UploadFile = File(...)):
 # Model Training
 # ============================================================================
 
-def get_model(model_type: str, params: Dict[str, Any], task_type: str):
+def get_model(model_type: str, params: Dict[str, Any], task_type: str, n_features: int = 1):
     """Get model instance based on type and parameters"""
 
     # Regression Models
@@ -283,140 +283,86 @@ def get_model(model_type: str, params: Dict[str, Any], task_type: str):
         )
 
     # Deep Learning Models
-    elif model_type == "mlp":
+    elif model_type in ("mlp", "lstm", "cnn_1d", "autoencoder"):
         if not TENSORFLOW_AVAILABLE:
             raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
-        units = params.get("units", 64)
-        layers_n = params.get("layers", 2)
-        dropout = params.get("dropout", 0.2)
-        activation = params.get("activation", "relu")
-        model = Sequential()
-        model.add(layers.Dense(units, activation=activation, input_shape=(1,)))
-        for _ in range(layers_n - 1):
-            model.add(layers.Dense(units, activation=activation))
-            model.add(layers.Dropout(dropout))
-        if task_type == "classification":
-            model.add(layers.Dense(1, activation="sigmoid"))
-        else:
-            model.add(layers.Dense(1))
-        optimizer = params.get("optimizer", "adam")
-        learning_rate = params.get("learning_rate", 0.001)
-        if optimizer == "adam":
-            opt = keras.optimizers.Adam(learning_rate=learning_rate)
-        elif optimizer == "sgd":
-            opt = keras.optimizers.SGD(learning_rate=learning_rate)
-        else:
-            opt = optimizer
-        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
-        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
-        model._hm_keras = True
-        return model
-
-    elif model_type == "lstm":
-        if not TENSORFLOW_AVAILABLE:
-            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
-        units = params.get("units", 64)
-        layers_n = params.get("layers", 2)
-        dropout = params.get("dropout", 0.2)
-        activation = params.get("activation", "tanh")
-        bidirectional = params.get("bidirectional", False)
-        model = Sequential()
-        lstm_layer = layers.LSTM(units, activation=activation, return_sequences=(layers_n > 1), input_shape=(1, 1))
-        if bidirectional:
-            lstm_layer = layers.Bidirectional(lstm_layer)
-        model.add(lstm_layer)
-        for i in range(1, layers_n):
-            lstm_layer = layers.LSTM(units, activation=activation, return_sequences=(i < layers_n - 1))
-            if bidirectional:
-                lstm_layer = layers.Bidirectional(lstm_layer)
-            model.add(lstm_layer)
-            model.add(layers.Dropout(dropout))
-        if task_type == "classification":
-            model.add(layers.Dense(1, activation="sigmoid"))
-        else:
-            model.add(layers.Dense(1))
-        optimizer = params.get("optimizer", "adam")
-        learning_rate = params.get("learning_rate", 0.001)
-        if optimizer == "adam":
-            opt = keras.optimizers.Adam(learning_rate=learning_rate)
-        elif optimizer == "sgd":
-            opt = keras.optimizers.SGD(learning_rate=learning_rate)
-        else:
-            opt = optimizer
-        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
-        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
-        model._hm_keras = True
-        return model
-
-    elif model_type == "cnn_1d":
-        if not TENSORFLOW_AVAILABLE:
-            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
-        units = params.get("units", 64)
-        layers_n = params.get("layers", 2)
-        dropout = params.get("dropout", 0.2)
-        activation = params.get("activation", "relu")
-        model = Sequential()
-        model.add(layers.Conv1D(filters=units, kernel_size=3, activation=activation, input_shape=(1, 1)))
-        model.add(layers.MaxPooling1D(pool_size=1))
-        for _ in range(layers_n - 1):
-            model.add(layers.Conv1D(filters=units, kernel_size=3, activation=activation))
-            model.add(layers.Dropout(dropout))
-        model.add(layers.Flatten())
-        model.add(layers.Dense(64, activation=activation))
-        if task_type == "classification":
-            model.add(layers.Dense(1, activation="sigmoid"))
-        else:
-            model.add(layers.Dense(1))
-        optimizer = params.get("optimizer", "adam")
-        learning_rate = params.get("learning_rate", 0.001)
-        if optimizer == "adam":
-            opt = keras.optimizers.Adam(learning_rate=learning_rate)
-        elif optimizer == "sgd":
-            opt = keras.optimizers.SGD(learning_rate=learning_rate)
-        else:
-            opt = optimizer
-        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
-        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
-        model._hm_keras = True
-        return model
-
-    elif model_type == "autoencoder":
-        if not TENSORFLOW_AVAILABLE:
-            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
-        units = params.get("units", 64)
-        layers_n = params.get("layers", 2)
-        dropout = params.get("dropout", 0.2)
-        activation = params.get("activation", "relu")
-        # Autoencoder: encoder-decoder
-        input_dim = 1  # Will be set during fit
-        model = Sequential()
-        # Encoder
-        model.add(layers.Dense(units, activation=activation, input_shape=(1,)))
-        for _ in range(layers_n - 1):
-            model.add(layers.Dense(units // 2, activation=activation))
-            model.add(layers.Dropout(dropout))
-        # Bottleneck
-        model.add(layers.Dense(units // 4, activation=activation))
-        # Decoder
-        for _ in range(layers_n - 1):
-            model.add(layers.Dense(units // 2, activation=activation))
-            model.add(layers.Dropout(dropout))
-        model.add(layers.Dense(1, activation="sigmoid" if task_type == "classification" else "linear"))
-        optimizer = params.get("optimizer", "adam")
-        learning_rate = params.get("learning_rate", 0.001)
-        if optimizer == "adam":
-            opt = keras.optimizers.Adam(learning_rate=learning_rate)
-        elif optimizer == "sgd":
-            opt = keras.optimizers.SGD(learning_rate=learning_rate)
-        else:
-            opt = optimizer
-        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
-        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
-        model._hm_keras = True
-        return model
+        return _build_dl_model(model_type, params, task_type, n_features)
 
     else:
         raise ValueError(f"Unknown model type: {model_type}")
+
+
+def _build_dl_model(model_type: str, params: dict, task_type: str, n_features: int):
+    """Build and compile a Keras deep learning model."""
+    units      = params.get("units", 64)
+    layers_n   = max(1, params.get("layers", 2))
+    dropout    = params.get("dropout", 0.2)
+    activation = params.get("activation", "relu" if model_type != "lstm" else "tanh")
+    lr         = params.get("learning_rate", 0.001)
+    opt_name   = params.get("optimizer", "adam")
+    is_cls     = (task_type == "classification")
+    loss       = params.get("loss", "binary_crossentropy" if is_cls else "mse")
+
+    # ── Build architecture ────────────────────────────────────────────
+    model = Sequential()
+
+    if model_type == "mlp":
+        model.add(layers.Dense(units, activation=activation, input_shape=(n_features,)))
+        for _ in range(layers_n - 1):
+            model.add(layers.Dense(units, activation=activation))
+            model.add(layers.Dropout(dropout))
+
+    elif model_type == "lstm":
+        bidir = params.get("bidirectional", False)
+        for i in range(layers_n):
+            ret_seq = (i < layers_n - 1)
+            lyr = layers.LSTM(units, activation=activation, return_sequences=ret_seq,
+                              input_shape=(1, n_features) if i == 0 else None)
+            model.add(layers.Bidirectional(lyr) if bidir else lyr)
+            if i > 0:
+                model.add(layers.Dropout(dropout))
+
+    elif model_type == "cnn_1d":
+        model.add(layers.Conv1D(filters=units, kernel_size=1, activation=activation,
+                                input_shape=(1, n_features)))
+        for _ in range(layers_n - 1):
+            model.add(layers.Conv1D(filters=units, kernel_size=1, activation=activation))
+            model.add(layers.Dropout(dropout))
+        model.add(layers.Flatten())
+        model.add(layers.Dense(64, activation=activation))
+
+    elif model_type == "autoencoder":
+        # Encoder
+        model.add(layers.Dense(units, activation=activation, input_shape=(n_features,)))
+        for _ in range(layers_n - 1):
+            model.add(layers.Dense(max(4, units // 2), activation=activation))
+            model.add(layers.Dropout(dropout))
+        # Bottleneck
+        model.add(layers.Dense(max(2, units // 4), activation=activation))
+        # Decoder
+        for _ in range(layers_n - 1):
+            model.add(layers.Dense(max(4, units // 2), activation=activation))
+            model.add(layers.Dropout(dropout))
+
+    # ── Output layer ──────────────────────────────────────────────────
+    if is_cls:
+        model.add(layers.Dense(1, activation="sigmoid"))
+    else:
+        model.add(layers.Dense(1))
+
+    # ── Compile ───────────────────────────────────────────────────────
+    optimizers = {
+        "adam":    keras.optimizers.Adam,
+        "sgd":     keras.optimizers.SGD,
+        "rmsprop": keras.optimizers.RMSprop,
+        "adamw":   keras.optimizers.AdamW if hasattr(keras.optimizers, "AdamW") else keras.optimizers.Adam,
+        "adagrad": keras.optimizers.Adagrad,
+    }
+    opt = optimizers.get(opt_name, keras.optimizers.Adam)(learning_rate=lr)
+    model.compile(optimizer=opt, loss=loss,
+                  metrics=["accuracy" if is_cls else "mse"])
+    model._hm_keras = True
+    return model
 
 def preprocess_data(df: pd.DataFrame, feature_cols: List[str], target_col: Optional[str] = None):
     """Preprocess data: handle nulls, encode categoricals, etc."""
@@ -547,10 +493,12 @@ async def train(request_body: Dict[str, Any]):
             )
 
             # Get and train model
-            model = get_model(model_type, params, task_type)
+            n_features = X_train.shape[1]
+            model = get_model(model_type, params, task_type, n_features=n_features)
 
             # Check if it's a deep learning model
             is_dl = hasattr(model, '_hm_keras') and model._hm_keras
+            dl_lc = []
 
             if is_dl:
                 # Deep learning model: reshape data for Keras
@@ -567,7 +515,7 @@ async def train(request_body: Dict[str, Any]):
                 validation_split = params.get("validation_split", 0.1)
 
                 # Train the model with verbose=0 to suppress output
-                model.fit(
+                history = model.fit(
                     X_train_dl, y_train,
                     epochs=epochs,
                     batch_size=batch_size,
@@ -576,6 +524,19 @@ async def train(request_body: Dict[str, Any]):
                 )
                 training_time = time.time() - start_time
                 y_pred = model.predict(X_test_dl, verbose=0).flatten()
+
+                # Extract training history as learning curve
+                dl_history = history.history
+                loss_key = "loss"
+                val_loss_key = "val_loss"
+                if loss_key in dl_history and val_loss_key in dl_history:
+                    dl_lc = []
+                    for epoch_i, (tl, vl) in enumerate(zip(dl_history[loss_key], dl_history[val_loss_key])):
+                        dl_lc.append({
+                            "x": epoch_i + 1,
+                            "train_score": round(float(tl), 4),
+                            "val_score": round(float(vl), 4),
+                        })
             else:
                 # sklearn model: standard fit
                 model.fit(X_train, y_train)
@@ -665,101 +626,106 @@ async def train(request_body: Dict[str, Any]):
                 feature_importance = {feat: imp for feat, imp in zip(feature_columns, importances)}
                 result["feature_importances"] = feature_importance
 
+            # Add DL training history as learning curve
+            if is_dl and dl_lc:
+                result["learning_curve"] = dl_lc
+                result["learning_curve_x_label"] = "Epoch (Loss)"
+
             # ── Learning / Validation Curve ──────────────────────────────────
-            try:
-                lc_data    = []
-                lc_x_label = "Training Samples"
-                is_reg     = (task_type == "regression")
-                score_fn   = r2_score if is_reg else accuracy_score
-                cls_name   = type(model).__name__
+            if not is_dl:
+                try:
+                    lc_data    = []
+                    lc_x_label = "Training Samples"
+                    is_reg     = (task_type == "regression")
+                    score_fn   = r2_score if is_reg else accuracy_score
+                    cls_name   = type(model).__name__
 
-                if cls_name in ("GradientBoostingRegressor", "GradientBoostingClassifier"):
-                    # staged_predict: already trained, O(n_estimators) predictions only
-                    lc_x_label = "Estimators"
-                    n_est      = model.n_estimators
-                    step       = max(1, n_est // 20)
-                    tr_preds   = list(model.staged_predict(X_train))
-                    va_preds   = list(model.staged_predict(X_test))
-                    for i in range(step - 1, n_est, step):
-                        lc_data.append({
-                            "x":           i + 1,
-                            "train_score": round(float(score_fn(y_train, tr_preds[i])), 4),
-                            "val_score":   round(float(score_fn(y_test,  va_preds[i])), 4),
-                        })
+                    if cls_name in ("GradientBoostingRegressor", "GradientBoostingClassifier"):
+                        lc_x_label = "Estimators"
+                        n_est      = model.n_estimators
+                        step       = max(1, n_est // 20)
+                        tr_preds   = list(model.staged_predict(X_train))
+                        va_preds   = list(model.staged_predict(X_test))
+                        for i in range(step - 1, n_est, step):
+                            lc_data.append({
+                                "x":           i + 1,
+                                "train_score": round(float(score_fn(y_train, tr_preds[i])), 4),
+                                "val_score":   round(float(score_fn(y_test,  va_preds[i])), 4),
+                            })
 
-                else:
-                    # Generic sklearn learning curve — works for every estimator
-                    scoring  = "r2" if is_reg else "accuracy"
-                    n_total  = len(X)
-                    n_pts    = 6 if n_total >= 300 else max(3, n_total // 50)
-                    ts, tr_sc, va_sc = sk_learning_curve(
-                        get_model(model_type, params, task_type),
-                        X, y,
-                        train_sizes=np.linspace(0.15, 1.0, n_pts),
-                        cv=3,
-                        scoring=scoring,
-                        n_jobs=1,
-                        error_score=0.0,
-                    )
-                    for size, tr, va in zip(ts, tr_sc.mean(axis=1), va_sc.mean(axis=1)):
-                        lc_data.append({
-                            "x":           int(size),
-                            "train_score": round(float(tr), 4),
-                            "val_score":   round(float(va), 4),
-                        })
+                    else:
+                        scoring  = "r2" if is_reg else "accuracy"
+                        n_total  = len(X)
+                        n_pts    = 6 if n_total >= 300 else max(3, n_total // 50)
+                        ts, tr_sc, va_sc = sk_learning_curve(
+                            get_model(model_type, params, task_type, n_features=n_features),
+                            X, y,
+                            train_sizes=np.linspace(0.15, 1.0, n_pts),
+                            cv=3,
+                            scoring=scoring,
+                            n_jobs=1,
+                            error_score=0.0,
+                        )
+                        for size, tr, va in zip(ts, tr_sc.mean(axis=1), va_sc.mean(axis=1)):
+                            lc_data.append({
+                                "x":           int(size),
+                                "train_score": round(float(tr), 4),
+                                "val_score":   round(float(va), 4),
+                            })
 
-                if lc_data:
-                    result["learning_curve"]         = lc_data
-                    result["learning_curve_x_label"] = lc_x_label
-            except Exception:
-                pass  # Learning curve is optional — never fail the main response
+                    if lc_data:
+                        result["learning_curve"]         = lc_data
+                        result["learning_curve_x_label"] = lc_x_label
+                except Exception:
+                    pass  # Learning curve is optional — never fail the main response
 
             # ── Cross-Validation (5-fold) ─────────────────────────────────────
-            try:
-                cv_metrics = {}
-                cv_folds   = 5
+            if not is_dl:
+                try:
+                    cv_metrics = {}
+                    cv_folds   = 5
 
-                if task_type == "regression":
-                    for sk_scoring, label in [
-                        ("r2",                          "r2"),
-                        ("neg_mean_absolute_error",     "mae"),
-                        ("neg_root_mean_squared_error", "rmse"),
-                    ]:
-                        cv_s = cross_val_score(
-                            get_model(model_type, params, task_type),
-                            X, y, cv=cv_folds, scoring=sk_scoring,
-                            n_jobs=1, error_score=0.0,
-                        )
-                        if sk_scoring.startswith("neg_"):
-                            cv_s = -cv_s
-                        cv_metrics[label] = {
-                            "mean":   round(float(cv_s.mean()), 4),
-                            "std":    round(float(cv_s.std()),  4),
-                            "scores": [round(float(s), 4) for s in cv_s],
-                        }
+                    if task_type == "regression":
+                        for sk_scoring, label in [
+                            ("r2",                          "r2"),
+                            ("neg_mean_absolute_error",     "mae"),
+                            ("neg_root_mean_squared_error", "rmse"),
+                        ]:
+                            cv_s = cross_val_score(
+                                get_model(model_type, params, task_type, n_features=n_features),
+                                X, y, cv=cv_folds, scoring=sk_scoring,
+                                n_jobs=1, error_score=0.0,
+                            )
+                            if sk_scoring.startswith("neg_"):
+                                cv_s = -cv_s
+                            cv_metrics[label] = {
+                                "mean":   round(float(cv_s.mean()), 4),
+                                "std":    round(float(cv_s.std()),  4),
+                                "scores": [round(float(s), 4) for s in cv_s],
+                            }
 
-                else:  # classification
-                    for sk_scoring, label in [
-                        ("accuracy",           "accuracy"),
-                        ("f1_weighted",        "f1"),
-                        ("precision_weighted", "precision"),
-                        ("recall_weighted",    "recall"),
-                    ]:
-                        cv_s = cross_val_score(
-                            get_model(model_type, params, task_type),
-                            X, y, cv=cv_folds, scoring=sk_scoring,
-                            n_jobs=1, error_score=0.0,
-                        )
-                        cv_metrics[label] = {
-                            "mean":   round(float(cv_s.mean()), 4),
-                            "std":    round(float(cv_s.std()),  4),
-                            "scores": [round(float(s), 4) for s in cv_s],
-                        }
+                    else:  # classification
+                        for sk_scoring, label in [
+                            ("accuracy",           "accuracy"),
+                            ("f1_weighted",        "f1"),
+                            ("precision_weighted", "precision"),
+                            ("recall_weighted",    "recall"),
+                        ]:
+                            cv_s = cross_val_score(
+                                get_model(model_type, params, task_type, n_features=n_features),
+                                X, y, cv=cv_folds, scoring=sk_scoring,
+                                n_jobs=1, error_score=0.0,
+                            )
+                            cv_metrics[label] = {
+                                "mean":   round(float(cv_s.mean()), 4),
+                                "std":    round(float(cv_s.std()),  4),
+                                "scores": [round(float(s), 4) for s in cv_s],
+                            }
 
-                if cv_metrics:
-                    result["cv_scores"] = cv_metrics
-            except Exception:
-                pass  # CV is optional — never fail the main response
+                    if cv_metrics:
+                        result["cv_scores"] = cv_metrics
+                except Exception:
+                    pass  # CV is optional — never fail the main response
 
             return result
 
