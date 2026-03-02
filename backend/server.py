@@ -282,6 +282,139 @@ def get_model(model_type: str, params: Dict[str, Any], task_type: str):
             linkage=params.get("linkage", "ward")
         )
 
+    # Deep Learning Models
+    elif model_type == "mlp":
+        if not TENSORFLOW_AVAILABLE:
+            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
+        units = params.get("units", 64)
+        layers_n = params.get("layers", 2)
+        dropout = params.get("dropout", 0.2)
+        activation = params.get("activation", "relu")
+        model = Sequential()
+        model.add(layers.Dense(units, activation=activation, input_shape=(1,)))
+        for _ in range(layers_n - 1):
+            model.add(layers.Dense(units, activation=activation))
+            model.add(layers.Dropout(dropout))
+        if task_type == "classification":
+            model.add(layers.Dense(1, activation="sigmoid"))
+        else:
+            model.add(layers.Dense(1))
+        optimizer = params.get("optimizer", "adam")
+        learning_rate = params.get("learning_rate", 0.001)
+        if optimizer == "adam":
+            opt = keras.optimizers.Adam(learning_rate=learning_rate)
+        elif optimizer == "sgd":
+            opt = keras.optimizers.SGD(learning_rate=learning_rate)
+        else:
+            opt = optimizer
+        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
+        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
+        model._hm_keras = True
+        return model
+
+    elif model_type == "lstm":
+        if not TENSORFLOW_AVAILABLE:
+            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
+        units = params.get("units", 64)
+        layers_n = params.get("layers", 2)
+        dropout = params.get("dropout", 0.2)
+        activation = params.get("activation", "tanh")
+        bidirectional = params.get("bidirectional", False)
+        model = Sequential()
+        lstm_layer = layers.LSTM(units, activation=activation, return_sequences=(layers_n > 1), input_shape=(1, 1))
+        if bidirectional:
+            lstm_layer = layers.Bidirectional(lstm_layer)
+        model.add(lstm_layer)
+        for i in range(1, layers_n):
+            lstm_layer = layers.LSTM(units, activation=activation, return_sequences=(i < layers_n - 1))
+            if bidirectional:
+                lstm_layer = layers.Bidirectional(lstm_layer)
+            model.add(lstm_layer)
+            model.add(layers.Dropout(dropout))
+        if task_type == "classification":
+            model.add(layers.Dense(1, activation="sigmoid"))
+        else:
+            model.add(layers.Dense(1))
+        optimizer = params.get("optimizer", "adam")
+        learning_rate = params.get("learning_rate", 0.001)
+        if optimizer == "adam":
+            opt = keras.optimizers.Adam(learning_rate=learning_rate)
+        elif optimizer == "sgd":
+            opt = keras.optimizers.SGD(learning_rate=learning_rate)
+        else:
+            opt = optimizer
+        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
+        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
+        model._hm_keras = True
+        return model
+
+    elif model_type == "cnn_1d":
+        if not TENSORFLOW_AVAILABLE:
+            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
+        units = params.get("units", 64)
+        layers_n = params.get("layers", 2)
+        dropout = params.get("dropout", 0.2)
+        activation = params.get("activation", "relu")
+        model = Sequential()
+        model.add(layers.Conv1D(filters=units, kernel_size=3, activation=activation, input_shape=(1, 1)))
+        model.add(layers.MaxPooling1D(pool_size=1))
+        for _ in range(layers_n - 1):
+            model.add(layers.Conv1D(filters=units, kernel_size=3, activation=activation))
+            model.add(layers.Dropout(dropout))
+        model.add(layers.Flatten())
+        model.add(layers.Dense(64, activation=activation))
+        if task_type == "classification":
+            model.add(layers.Dense(1, activation="sigmoid"))
+        else:
+            model.add(layers.Dense(1))
+        optimizer = params.get("optimizer", "adam")
+        learning_rate = params.get("learning_rate", 0.001)
+        if optimizer == "adam":
+            opt = keras.optimizers.Adam(learning_rate=learning_rate)
+        elif optimizer == "sgd":
+            opt = keras.optimizers.SGD(learning_rate=learning_rate)
+        else:
+            opt = optimizer
+        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
+        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
+        model._hm_keras = True
+        return model
+
+    elif model_type == "autoencoder":
+        if not TENSORFLOW_AVAILABLE:
+            raise ValueError("TensorFlow not installed. Install with: pip install tensorflow")
+        units = params.get("units", 64)
+        layers_n = params.get("layers", 2)
+        dropout = params.get("dropout", 0.2)
+        activation = params.get("activation", "relu")
+        # Autoencoder: encoder-decoder
+        input_dim = 1  # Will be set during fit
+        model = Sequential()
+        # Encoder
+        model.add(layers.Dense(units, activation=activation, input_shape=(1,)))
+        for _ in range(layers_n - 1):
+            model.add(layers.Dense(units // 2, activation=activation))
+            model.add(layers.Dropout(dropout))
+        # Bottleneck
+        model.add(layers.Dense(units // 4, activation=activation))
+        # Decoder
+        for _ in range(layers_n - 1):
+            model.add(layers.Dense(units // 2, activation=activation))
+            model.add(layers.Dropout(dropout))
+        model.add(layers.Dense(1, activation="sigmoid" if task_type == "classification" else "linear"))
+        optimizer = params.get("optimizer", "adam")
+        learning_rate = params.get("learning_rate", 0.001)
+        if optimizer == "adam":
+            opt = keras.optimizers.Adam(learning_rate=learning_rate)
+        elif optimizer == "sgd":
+            opt = keras.optimizers.SGD(learning_rate=learning_rate)
+        else:
+            opt = optimizer
+        loss = params.get("loss", "binary_crossentropy" if task_type == "classification" else "mse")
+        model.compile(optimizer=opt, loss=loss, metrics=["accuracy" if task_type == "classification" else "mse"])
+        model._hm_keras = True
+        return model
+
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -349,6 +482,13 @@ async def train(request_body: Dict[str, Any]):
         elif model_type in ["arima", "sarima", "exponential_smoothing"]:
             task_type = "time_series"
 
+        # For deep learning models, infer task type from target variable if not explicitly a classifier
+        if model_type in ["mlp", "lstm", "cnn_1d", "autoencoder"] and task_type == "regression":
+            # Check target column to infer: few unique values = classification
+            unique_vals = len(df[target_column].unique())
+            if unique_vals <= 10 and unique_vals <= len(df) * 0.1:
+                task_type = "classification"
+
         # For clustering, we don't need target
         if task_type != "clustering":
             if target_column not in df.columns:
@@ -408,11 +548,39 @@ async def train(request_body: Dict[str, Any]):
 
             # Get and train model
             model = get_model(model_type, params, task_type)
-            model.fit(X_train, y_train)
-            training_time = time.time() - start_time
 
-            # Predictions
-            y_pred = model.predict(X_test)
+            # Check if it's a deep learning model
+            is_dl = hasattr(model, '_hm_keras') and model._hm_keras
+
+            if is_dl:
+                # Deep learning model: reshape data for Keras
+                # Keras expects (samples, timesteps, features) for LSTM/CNN, or (samples, features) for Dense
+                if model_type == "lstm" or model_type == "cnn_1d":
+                    X_train_dl = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
+                    X_test_dl = X_test.reshape((X_test.shape[0], 1, X_test.shape[1]))
+                else:
+                    X_train_dl = X_train
+                    X_test_dl = X_test
+
+                epochs = params.get("epochs", 50)
+                batch_size = params.get("batch_size", 32)
+                validation_split = params.get("validation_split", 0.1)
+
+                # Train the model with verbose=0 to suppress output
+                model.fit(
+                    X_train_dl, y_train,
+                    epochs=epochs,
+                    batch_size=batch_size,
+                    validation_split=validation_split,
+                    verbose=0
+                )
+                training_time = time.time() - start_time
+                y_pred = model.predict(X_test_dl, verbose=0).flatten()
+            else:
+                # sklearn model: standard fit
+                model.fit(X_train, y_train)
+                training_time = time.time() - start_time
+                y_pred = model.predict(X_test)
 
             if task_type == "regression":
                 # Regression metrics
@@ -440,25 +608,37 @@ async def train(request_body: Dict[str, Any]):
                 }
 
             else:  # Classification
-                accuracy = accuracy_score(y_test, y_pred)
-                precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
-                recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
-                f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0)
+                # For deep learning, y_pred might be probabilities; threshold them
+                if is_dl and np.max(y_pred) <= 1.0 and np.min(y_pred) >= 0:
+                    y_pred_binary = (y_pred > 0.5).astype(int).flatten()
+                else:
+                    y_pred_binary = y_pred
+
+                accuracy = accuracy_score(y_test, y_pred_binary)
+                precision = precision_score(y_test, y_pred_binary, average="weighted", zero_division=0)
+                recall = recall_score(y_test, y_pred_binary, average="weighted", zero_division=0)
+                f1 = f1_score(y_test, y_pred_binary, average="weighted", zero_division=0)
 
                 roc_auc = 0
                 try:
                     if len(np.unique(y_test)) == 2:
-                        y_prob = model.predict_proba(X_test)[:, 1]
+                        if is_dl:
+                            y_prob = y_pred.flatten()
+                        else:
+                            y_prob = model.predict_proba(X_test)[:, 1]
                         roc_auc = roc_auc_score(y_test, y_prob)
                 except:
                     pass
 
-                cm = confusion_matrix(y_test, y_pred).tolist()
+                cm = confusion_matrix(y_test, y_pred_binary).tolist()
 
                 y_prob = None
                 try:
-                    y_prob = model.predict_proba(X_test)
-                    y_prob = y_prob.tolist()
+                    if is_dl:
+                        y_prob = y_pred.flatten().tolist()
+                    else:
+                        y_prob = model.predict_proba(X_test)
+                        y_prob = y_prob.tolist()
                 except:
                     pass
 
@@ -474,7 +654,7 @@ async def train(request_body: Dict[str, Any]):
                         "roc_auc": float(roc_auc)
                     },
                     "y_test": y_test.tolist(),
-                    "y_pred": y_pred.tolist(),
+                    "y_pred": y_pred_binary.tolist() if hasattr(y_pred_binary, 'tolist') else y_pred_binary,
                     "y_prob": y_prob,
                     "confusion_matrix": cm
                 }

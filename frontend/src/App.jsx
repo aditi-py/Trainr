@@ -818,48 +818,6 @@ function StepModel({ state, dispatch }) {
   // Recommendation logic — per-category, data-aware
   const hasDatetime = Object.values(data.types || {}).some(v => v === 'datetime');
 
-  // Per-category best model keyed by tab name, based on dataset shape
-  const recommendations = useMemo(() => {
-    const rows     = data.shape?.rows || 0;
-    const types    = data.types || {};
-    const numCols  = Object.values(types).filter(v => v === 'numeric').length;
-    const colCount = Object.keys(types).length;
-
-    if (hasDatetime)   return { Statistical: 'arima' };
-    if (numCols === 0) return { Clustering: 'kmeans' };
-
-    let reg, cls;
-    if      (rows < 500)   { reg = 'ridge';                       cls = 'logistic_regression';        }
-    else if (rows < 5000)  { reg = 'random_forest_regressor';     cls = 'random_forest_classifier';   }
-    else if (rows < 20000) { reg = 'gradient_boosting_regressor'; cls = 'gradient_boosting_classifier';}
-    else                   { reg = 'xgboost_regressor';           cls = 'xgboost_classifier';         }
-
-    // High-dimensional sparse data → regularised linear handles it better
-    if (colCount > 30 && rows < 2000) { reg = 'lasso'; cls = 'logistic_regression'; }
-
-    return { Regression: reg, Classification: cls, Clustering: 'kmeans' };
-  }, [data.shape, data.types, hasDatetime]);
-
-  const recommendedTab = useMemo(() => {
-    if (hasDatetime) return 'Statistical';
-    const numericCols = Object.entries(data.types || {}).filter(([, v]) => v === 'numeric');
-    if (numericCols.length > 0) return 'Regression';
-    return 'Clustering';
-  }, [data.types, hasDatetime]);
-
-  // Single model id for the banner: use the recommended-tab's suggestion
-  const recommendation = useMemo(() => (
-    recommendations[recommendedTab] || Object.values(recommendations)[0] || null
-  ), [recommendations, recommendedTab]);
-
-  const recModel = useMemo(() => {
-    for (const [, models] of Object.entries(MODEL_CATALOG)) {
-      const m = models.find(x => x.id === recommendation);
-      if (m) return m;
-    }
-    return null;
-  }, [recommendation]);
-
   const selectModel = (m, tab) => {
     dispatch({ type: 'SET_MODEL', payload: { id: m.id, name: m.name, taskType: m.taskType, category: tab } });
     dispatch({ type: 'RESET_PARAMS', payload: defaultParams(m.id) });
@@ -873,25 +831,6 @@ function StepModel({ state, dispatch }) {
         <h2 style={{ fontSize: 22, fontWeight: 700, color: t.text, marginBottom: 6 }}>Select a Model</h2>
         <p style={{ color: t.muted, fontSize: 14 }}>Choose the algorithm that best fits your problem.</p>
       </div>
-
-      {/* Recommendation banner */}
-      {recModel && (
-        <div style={{
-          background: `${t.accent}15`, border: `1px solid ${t.accent}44`,
-          borderRadius: 10, padding: '12px 16px',
-          display: 'flex', alignItems: 'center', gap: 12,
-        }}>
-          <span style={{ fontSize: 20 }}>✨</span>
-          <div style={{ flex: 1 }}>
-            <span style={{ color: t.accent, fontWeight: 700, fontSize: 14 }}>Recommended: </span>
-            <span style={{ color: t.text, fontSize: 14 }}>{recModel.name}</span>
-            <p style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>Based on your data profile</p>
-          </div>
-          <Button dark={dark} size="sm" onClick={() => { setActiveTab(recommendedTab); selectModel(recModel, recommendedTab); }}>
-            Use It
-          </Button>
-        </div>
-      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${t.border}`, paddingBottom: 0 }}>
@@ -911,7 +850,6 @@ function StepModel({ state, dispatch }) {
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
           {(MODEL_CATALOG[activeTab] || []).map(m => {
             const selected = model.id === m.id;
-            const isRec    = m.id === (recommendations[activeTab] ?? recommendation);
             return (
               <div key={m.id} onClick={() => selectModel(m, activeTab)} style={{
                 background: t.card, border: `2px solid ${selected ? t.accent : t.border}`,
@@ -919,12 +857,7 @@ function StepModel({ state, dispatch }) {
                 transition: t.trans, position: 'relative',
                 boxShadow: selected ? `0 0 0 3px ${t.accent}33` : t.shadow,
               }}>
-                {isRec && (
-                  <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                    <Badge color={t.accent}>Recommended</Badge>
-                  </div>
-                )}
-                <p style={{ fontWeight: 700, fontSize: 14, color: t.text, marginBottom: 6, paddingRight: isRec ? 90 : 0 }}>{m.name}</p>
+                <p style={{ fontWeight: 700, fontSize: 14, color: t.text, marginBottom: 6 }}>{m.name}</p>
                 <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.5, marginBottom: 10 }}>{m.desc}</p>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <Badge color={COMPLEXITY_COLOR[m.complexity]}>{m.complexity} Complexity</Badge>
@@ -1578,6 +1511,45 @@ function StepResults({ state, dispatch }) {
     : taskType === 'classification' ? classificationMetrics
     : clusteringMetrics;
 
+  const generateAnalysis = () => {
+    const m = metrics;
+    if (taskType === 'classification') {
+      const acc = m.accuracy ?? 0;
+      const prec = m.precision ?? 0;
+      const rec = m.recall ?? 0;
+      const f1Val = m.f1 ?? 0;
+      let analysis = '';
+      if (acc >= 0.9) analysis = `Excellent model with ${(acc*100).toFixed(1)}% accuracy.`;
+      else if (acc >= 0.8) analysis = `Strong model with ${(acc*100).toFixed(1)}% accuracy.`;
+      else if (acc >= 0.7) analysis = `Decent model with ${(acc*100).toFixed(1)}% accuracy.`;
+      else if (acc >= 0.6) analysis = `Fair model with ${(acc*100).toFixed(1)}% accuracy. Consider feature engineering or trying different models.`;
+      else analysis = `Weak model with ${(acc*100).toFixed(1)}% accuracy. The model needs significant improvement.`;
+      if (Math.abs(prec - rec) > 0.15) {
+        if (prec > rec) analysis += ` Precision (${(prec*100).toFixed(1)}%) is higher than recall (${(rec*100).toFixed(1)}%), indicating false positives are minimized.`;
+        else analysis += ` Recall (${(rec*100).toFixed(1)}%) is higher than precision (${(prec*100).toFixed(1)}%), indicating the model catches more true positives.`;
+      }
+      return analysis;
+    } else if (taskType === 'regression') {
+      const r2 = m.r2 ?? 0;
+      const rmse = m.rmse ?? 0;
+      let analysis = '';
+      if (r2 >= 0.9) analysis = `Excellent regression with R² = ${r2.toFixed(4)}.`;
+      else if (r2 >= 0.7) analysis = `Strong regression with R² = ${r2.toFixed(4)}.`;
+      else if (r2 >= 0.5) analysis = `Moderate regression with R² = ${r2.toFixed(4)}.`;
+      else if (r2 >= 0) analysis = `Weak regression with R² = ${r2.toFixed(4)}. The model explains little variance.`;
+      else analysis = `Poor regression with R² = ${r2.toFixed(4)}. The model performs worse than a baseline.`;
+      if (rmse) analysis += ` Average prediction error (RMSE): ${rmse.toFixed(4)}.`;
+      return analysis;
+    } else if (taskType === 'clustering') {
+      const sil = m.silhouette_score ?? 0;
+      if (sil >= 0.7) return `Excellent clustering (silhouette: ${sil.toFixed(4)}). Clusters are well-separated.`;
+      else if (sil >= 0.5) return `Good clustering (silhouette: ${sil.toFixed(4)}). Clusters are reasonably separated.`;
+      else if (sil >= 0.3) return `Fair clustering (silhouette: ${sil.toFixed(4)}). Clusters overlap somewhat.`;
+      else return `Poor clustering (silhouette: ${sil.toFixed(4)}). Try different parameters or feature scaling.`;
+    }
+    return 'No analysis available for this task type.';
+  };
+
   const addToComparison = () => {
     const comp = results.comparison || [];
     if (comp.length >= 3) { toast('Max 3 models for comparison', 'error'); return; }
@@ -2106,6 +2078,81 @@ ${modelCards}
             </ResponsiveContainer>
           </Card>
         )}
+
+        {/* Key Metrics Display */}
+        {taskType === 'classification' && (
+          <Card dark={dark} style={{ gridColumn: 'span 2' }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 12 }}>
+              Classification Metrics
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+              {['accuracy', 'precision', 'recall', 'f1'].map(metric => {
+                const val = metrics[metric];
+                if (val === undefined) return null;
+                const num = typeof val === 'number' ? val : parseFloat(val);
+                const pct = Math.max(0, Math.min(1, num));
+                const metricColor = num >= 0.8 ? '#39ff14' : num >= 0.6 ? '#00ffd5' : num >= 0.4 ? '#ffaa00' : '#ff006e';
+                return (
+                  <div key={metric} style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 8, padding: 12 }}>
+                    <p style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                      {metric === 'f1' ? 'F1 Score' : metric.charAt(0).toUpperCase() + metric.slice(1)}
+                    </p>
+                    <p style={{ fontSize: 22, fontWeight: 700, color: metricColor, fontFamily: 'DM Mono, monospace', marginBottom: 4 }}>
+                      {num.toFixed(4)}
+                    </p>
+                    <div style={{ background: t.border, height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 8 }}>
+                      <div style={{ background: metricColor, height: '100%', width: `${pct * 100}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        {/* Regression Metrics Display */}
+        {taskType === 'regression' && (
+          <Card dark={dark} style={{ gridColumn: 'span 2' }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 12 }}>
+              Regression Metrics
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+              {['r2', 'mae', 'rmse', 'mape'].map(metric => {
+                const val = metrics[metric];
+                if (val === undefined) return null;
+                const num = typeof val === 'number' ? val : parseFloat(val);
+                const isR2 = metric === 'r2';
+                const pct = isR2 ? Math.max(0, Math.min(1, num)) : Math.max(0, Math.min(1, 1 - Math.min(num, 1)));
+                const metricColor = isR2
+                  ? (num >= 0.8 ? '#39ff14' : num >= 0.6 ? '#00ffd5' : num >= 0.4 ? '#ffaa00' : '#ff006e')
+                  : (num <= 0.2 ? '#39ff14' : num <= 0.4 ? '#00ffd5' : num <= 0.6 ? '#ffaa00' : '#ff006e');
+                return (
+                  <div key={metric} style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 8, padding: 12 }}>
+                    <p style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                      {metric === 'r2' ? 'R² Score' : metric.toUpperCase()}
+                    </p>
+                    <p style={{ fontSize: 22, fontWeight: 700, color: metricColor, fontFamily: 'DM Mono, monospace', marginBottom: 4 }}>
+                      {num.toFixed(4)}
+                    </p>
+                    <div style={{ background: t.border, height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 8 }}>
+                      <div style={{ background: metricColor, height: '100%', width: `${pct * 100}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        {/* Model Analysis */}
+        <Card dark={dark} style={{ gridColumn: 'span 2' }}>
+          <h4 style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 8 }}>
+            Model Performance Analysis
+          </h4>
+          <p style={{ fontSize: 14, color: t.text, lineHeight: 1.6, fontStyle: 'italic' }}>
+            {generateAnalysis()}
+          </p>
+        </Card>
       </div>
 
       {/* Model comparison panel */}
