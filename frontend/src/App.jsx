@@ -1940,6 +1940,52 @@ ${modelCards}
         {displayMetrics.map(k => <MetricCard key={k} mkey={k} value={metrics[k]} dark={dark} />)}
       </div>
 
+      {/* Cross-Validation scores */}
+      {current.cv_scores && Object.keys(current.cv_scores).length > 0 && (
+        <Card dark={dark}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: t.text, margin: 0 }}>5-Fold Cross-Validation</h4>
+              <p style={{ fontSize: 11, color: t.muted, marginTop: 3 }}>
+                Each metric is scored across 5 independent folds — more reliable than a single train/test split.
+              </p>
+            </div>
+            <span style={{ fontSize: 11, color: t.accent, fontFamily: 'Share Tech Mono, monospace', border: `1px solid ${t.accent}44`, padding: '2px 8px', borderRadius: 4 }}>
+              cv=5
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {Object.entries(current.cv_scores).map(([key, { mean, std, scores }]) => {
+              const pct = Math.max(0, Math.min(1, mean));
+              const barColor = mean >= 0.8 ? '#39ff14' : mean >= 0.6 ? '#00ffd5' : mean >= 0.4 ? '#ffaa00' : '#ff006e';
+              return (
+                <div key={key}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, color: t.muted, textTransform: 'uppercase', letterSpacing: '0.5px', width: 72, flexShrink: 0 }}>{key}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: 'Share Tech Mono, monospace', minWidth: 60 }}>
+                      {mean.toFixed(4)}
+                    </span>
+                    <span style={{ fontSize: 12, color: t.muted }}>± {std.toFixed(4)}</span>
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                      {scores.map((s, i) => (
+                        <div key={i} title={`Fold ${i + 1}: ${s}`} style={{
+                          width: 28, height: 6, borderRadius: 3,
+                          background: `${barColor}${Math.round(40 + (Math.max(0, s) * 180)).toString(16).padStart(2, '0')}`,
+                          border: `1px solid ${barColor}66`,
+                        }} />
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: t.border, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct * 100}%`, background: barColor, borderRadius: 2, transition: 'width 0.6s ease' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* Charts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>
         {/* Actual vs Predicted */}

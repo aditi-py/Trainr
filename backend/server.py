@@ -534,6 +534,53 @@ async def train(request_body: Dict[str, Any]):
             except Exception:
                 pass  # Learning curve is optional — never fail the main response
 
+            # ── Cross-Validation (5-fold) ─────────────────────────────────────
+            try:
+                cv_metrics = {}
+                cv_folds   = 5
+
+                if task_type == "regression":
+                    for sk_scoring, label in [
+                        ("r2",                          "r2"),
+                        ("neg_mean_absolute_error",     "mae"),
+                        ("neg_root_mean_squared_error", "rmse"),
+                    ]:
+                        cv_s = cross_val_score(
+                            get_model(model_type, params, task_type),
+                            X, y, cv=cv_folds, scoring=sk_scoring,
+                            n_jobs=1, error_score=0.0,
+                        )
+                        if sk_scoring.startswith("neg_"):
+                            cv_s = -cv_s
+                        cv_metrics[label] = {
+                            "mean":   round(float(cv_s.mean()), 4),
+                            "std":    round(float(cv_s.std()),  4),
+                            "scores": [round(float(s), 4) for s in cv_s],
+                        }
+
+                else:  # classification
+                    for sk_scoring, label in [
+                        ("accuracy",           "accuracy"),
+                        ("f1_weighted",        "f1"),
+                        ("precision_weighted", "precision"),
+                        ("recall_weighted",    "recall"),
+                    ]:
+                        cv_s = cross_val_score(
+                            get_model(model_type, params, task_type),
+                            X, y, cv=cv_folds, scoring=sk_scoring,
+                            n_jobs=1, error_score=0.0,
+                        )
+                        cv_metrics[label] = {
+                            "mean":   round(float(cv_s.mean()), 4),
+                            "std":    round(float(cv_s.std()),  4),
+                            "scores": [round(float(s), 4) for s in cv_s],
+                        }
+
+                if cv_metrics:
+                    result["cv_scores"] = cv_metrics
+            except Exception:
+                pass  # CV is optional — never fail the main response
+
             return result
 
     except Exception as e:
