@@ -647,6 +647,40 @@ function StepImport({ state, dispatch }) {
     if (file) handleFile(file);
   };
 
+  // Sample datasets
+  const [samples, setSamples] = useState([]);
+  const [loadingSample, setLoadingSample] = useState(null);
+  useEffect(() => {
+    fetch('http://localhost:8000/samples')
+      .then(r => r.json())
+      .then(d => setSamples(d.samples || []))
+      .catch(() => {});
+  }, []);
+
+  const loadSample = async (s) => {
+    setLoadingSample(s.filename);
+    try {
+      const res = await fetch(`http://localhost:8000/load_sample/${s.filename}`);
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      dispatch({ type: 'SET_DATA', payload: {
+        fileId:   json.file_id,
+        fileName: json.filename,
+        columns:  json.columns || [],
+        types:    json.inferred_types || {},
+        preview:  json.preview || [],
+        shape:    json.shape || {},
+      }});
+      toast(`"${s.label}" loaded!`, 'success');
+    } catch (err) {
+      toast(`Sample load failed: ${err.message}`, 'error');
+    } finally {
+      setLoadingSample(null);
+    }
+  };
+
+  const TYPE_COLOR = { CSV:'#00ffd5', Excel:'#39ff14', Parquet:'#ff006e', JSON:'#fbbf24', TXT:'#a78bfa' };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
@@ -703,6 +737,80 @@ function StepImport({ state, dispatch }) {
         <input ref={fileRef} type="file" style={{ display: 'none' }}
           onChange={(e) => handleFile(e.target.files[0])} />
       </div>
+
+      {/* Sample Datasets */}
+      {samples.length > 0 && (
+        <div>
+          {/* Divider */}
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+            <span style={{ flex:1, height:1, background: dark ? '#1a1a3e' : t.border }} />
+            <span style={{ fontSize:11, color:t.muted, fontFamily:'Share Tech Mono, monospace',
+                           letterSpacing:1.5, whiteSpace:'nowrap' }}>
+              OR TRY A SAMPLE DATASET
+            </span>
+            <span style={{ flex:1, height:1, background: dark ? '#1a1a3e' : t.border }} />
+          </div>
+
+          {['CSV','Excel','Parquet','JSON','TXT'].map(ftype => {
+            const group = samples.filter(s => s.type === ftype);
+            if (!group.length) return null;
+            const color = TYPE_COLOR[ftype] || t.accent;
+            return (
+              <div key={ftype} style={{ marginBottom:20 }}>
+                {/* Type badge */}
+                <div style={{ marginBottom:10 }}>
+                  <span style={{
+                    fontSize:10, fontWeight:700, letterSpacing:1.5,
+                    fontFamily:'Share Tech Mono, monospace',
+                    color, padding:'2px 10px',
+                    border:`1px solid ${color}55`, borderRadius:2,
+                    textShadow:`0 0 6px ${color}66`,
+                  }}>{ftype}</span>
+                </div>
+                {/* Cards grid */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', gap:10 }}>
+                  {group.map(s => (
+                    <div key={s.filename} className="neon-card" style={{
+                      background: dark ? '#0a0a1a' : '#fff',
+                      border:`1px solid ${dark ? '#1a1a3e' : t.border}`,
+                      borderRadius:4, padding:'14px 16px',
+                      display:'flex', flexDirection:'column', gap:10,
+                    }}>
+                      <div>
+                        <p style={{ fontWeight:700, fontSize:13, color:t.text, marginBottom:3 }}>{s.label}</p>
+                        <p style={{ fontSize:11, color:t.muted, lineHeight:1.45 }}>{s.desc}</p>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                          <Badge color={s.task === 'Regression' ? '#00ffd5' : '#ff006e'}
+                            style={{ fontSize:10 }}>{s.task}</Badge>
+                          <Badge color="#5565a0" style={{ fontSize:10 }}>{s.rows} rows</Badge>
+                          <Badge color="#5565a0" style={{ fontSize:10 }}>→ {s.target}</Badge>
+                        </div>
+                        <button
+                          onClick={() => loadSample(s)}
+                          disabled={!!loadingSample}
+                          style={{
+                            background: loadingSample === s.filename ? 'transparent' : `${color}18`,
+                            border:`1px solid ${color}66`, color, borderRadius:2,
+                            padding:'4px 14px', fontSize:11, cursor: loadingSample ? 'not-allowed' : 'pointer',
+                            fontFamily:'Share Tech Mono, monospace', letterSpacing:0.5,
+                            transition:t.trans, flexShrink:0,
+                          }}
+                          onMouseEnter={e => { if (!loadingSample) { e.currentTarget.style.background=`${color}30`; e.currentTarget.style.boxShadow=`0 0 8px ${color}44`; }}}
+                          onMouseLeave={e => { e.currentTarget.style.background=loadingSample===s.filename?'transparent':`${color}18`; e.currentTarget.style.boxShadow='none'; }}
+                        >
+                          {loadingSample === s.filename ? <Spinner size={12} /> : 'Load'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Uploading skeleton */}
       {uploading && (

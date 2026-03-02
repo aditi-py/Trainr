@@ -83,6 +83,108 @@ async def health():
 # File Upload & Data Profiling
 # ============================================================================
 
+SAMPLE_DATA_DIR = Path(__file__).parent / "sample_data"
+
+SAMPLE_CATALOG = [
+    # CSV
+    {"filename": "house_prices.csv",         "label": "House Prices",         "type": "CSV",     "task": "Regression",      "target": "price",              "rows": 200, "desc": "Predict property price from size, location & features"},
+    {"filename": "customer_churn.csv",        "label": "Customer Churn",        "type": "CSV",     "task": "Classification",  "target": "churned",            "rows": 250, "desc": "Predict whether a telecom customer will churn"},
+    {"filename": "diabetes_risk.csv",         "label": "Diabetes Risk",         "type": "CSV",     "task": "Classification",  "target": "at_risk",            "rows": 220, "desc": "Classify patient diabetes risk from health metrics"},
+    # Excel
+    {"filename": "retail_sales.xlsx",         "label": "Retail Sales",          "type": "Excel",   "task": "Regression",      "target": "weekly_sales",       "rows": 200, "desc": "Forecast weekly store sales from promotions & traffic"},
+    {"filename": "student_performance.xlsx",  "label": "Student Performance",   "type": "Excel",   "task": "Regression",      "target": "final_grade",        "rows": 200, "desc": "Predict student final grade from study habits"},
+    {"filename": "loan_approval.xlsx",        "label": "Loan Approval",         "type": "Excel",   "task": "Classification",  "target": "approved",           "rows": 220, "desc": "Classify loan applications by approval likelihood"},
+    # Parquet
+    {"filename": "energy_consumption.parquet","label": "Energy Consumption",    "type": "Parquet", "task": "Regression",      "target": "energy_kwh",         "rows": 300, "desc": "Predict hourly building energy usage from occupancy & weather"},
+    {"filename": "fraud_detection.parquet",   "label": "Fraud Detection",       "type": "Parquet", "task": "Classification",  "target": "is_fraud",           "rows": 300, "desc": "Detect fraudulent transactions by amount & merchant type"},
+    {"filename": "traffic_flow.parquet",      "label": "Traffic Flow",          "type": "Parquet", "task": "Regression",      "target": "vehicle_count",      "rows": 280, "desc": "Predict road vehicle count from time, weather & incidents"},
+    # JSON
+    {"filename": "user_engagement.json",      "label": "User Engagement",       "type": "JSON",    "task": "Regression",      "target": "session_duration_sec","rows": 220, "desc": "Predict user session duration from device & behaviour"},
+    {"filename": "medical_diagnosis.json",    "label": "Medical Diagnosis",     "type": "JSON",    "task": "Classification",  "target": "diagnosis",          "rows": 200, "desc": "Classify patient health risk from vitals & lifestyle"},
+    {"filename": "wine_quality.json",         "label": "Wine Quality",          "type": "JSON",    "task": "Regression",      "target": "quality",            "rows": 250, "desc": "Score wine quality from chemical composition"},
+    # TXT
+    {"filename": "air_quality.txt",           "label": "Air Quality Index",     "type": "TXT",     "task": "Regression",      "target": "aqi",                "rows": 220, "desc": "Predict AQI from pollutant concentrations & weather"},
+    {"filename": "delivery_time.txt",         "label": "Delivery Time",         "type": "TXT",     "task": "Regression",      "target": "delivery_days",      "rows": 200, "desc": "Estimate delivery days from distance, weight & priority"},
+    {"filename": "crop_yield.txt",            "label": "Crop Yield",            "type": "TXT",     "task": "Regression",      "target": "yield_tons_ha",      "rows": 220, "desc": "Predict crop yield from rainfall, soil & fertilizer"},
+]
+
+def _profile_df(df: pd.DataFrame, filename: str):
+    """Shared profiling logic for upload and load_sample."""
+    file_id = str(uuid.uuid4())
+    SESSIONS[file_id] = df
+    rows, cols = df.shape
+    columns = []
+    for col in df.columns:
+        columns.append({
+            "name": col,
+            "dtype": str(df[col].dtype),
+            "null_count": int(df[col].isnull().sum()),
+            "unique_count": int(df[col].nunique()),
+            "sample_values": df[col].dropna().head(5).tolist()
+        })
+    inferred_types = {}
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            inferred_types[col] = "numeric"
+        elif pd.api.types.is_datetime64_any_dtype(df[col]):
+            inferred_types[col] = "datetime"
+        elif df[col].nunique() / max(len(df), 1) < 0.05:
+            inferred_types[col] = "categorical"
+        else:
+            inferred_types[col] = "text"
+    stats = {}
+    for col in df.select_dtypes(include=[np.number]).columns:
+        stats[col] = {
+            "mean": float(df[col].mean()),
+            "std":  float(df[col].std()),
+            "min":  float(df[col].min()),
+            "max":  float(df[col].max()),
+            "25%":  float(df[col].quantile(0.25)),
+            "50%":  float(df[col].quantile(0.50)),
+            "75%":  float(df[col].quantile(0.75))
+        }
+    preview = df.head(10).to_dict(orient="records")
+    return {
+        "file_id": file_id,
+        "filename": filename,
+        "shape": {"rows": rows, "cols": cols},
+        "columns": columns,
+        "preview": preview,
+        "inferred_types": inferred_types,
+        "stats": stats
+    }
+
+@app.get("/samples")
+async def list_samples():
+    """Return the catalog of available sample datasets."""
+    return {"samples": SAMPLE_CATALOG}
+
+@app.get("/load_sample/{filename}")
+async def load_sample(filename: str):
+    """Load a sample dataset by filename and return the same profile as /upload."""
+    try:
+        path = SAMPLE_DATA_DIR / filename
+        if not path.exists():
+            raise HTTPException(status_code=404, detail=f"Sample '{filename}' not found")
+        ext = path.suffix.lower()
+        if ext == ".csv":
+            df = pd.read_csv(path)
+        elif ext in [".xlsx", ".xls"]:
+            df = pd.read_excel(path)
+        elif ext == ".parquet":
+            df = pd.read_parquet(path)
+        elif ext == ".json":
+            df = pd.read_json(path)
+        elif ext == ".txt":
+            df = pd.read_csv(path, sep="\t")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+        return _profile_df(df, filename)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error loading sample: {str(e)}")
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     """
@@ -109,61 +211,7 @@ async def upload(file: UploadFile = File(...)):
         else:
             raise ValueError(f"Unsupported format: {ext}")
 
-        # Generate file ID and store
-        file_id = str(uuid.uuid4())
-        SESSIONS[file_id] = df
-
-        # Profile data
-        rows, cols = df.shape
-
-        # Column information
-        columns = []
-        for col in df.columns:
-            columns.append({
-                "name": col,
-                "dtype": str(df[col].dtype),
-                "null_count": int(df[col].isnull().sum()),
-                "unique_count": int(df[col].nunique()),
-                "sample_values": df[col].dropna().head(5).tolist()
-            })
-
-        # Infer column types
-        inferred_types = {}
-        for col in df.columns:
-            if pd.api.types.is_numeric_dtype(df[col]):
-                inferred_types[col] = "numeric"
-            elif pd.api.types.is_datetime64_any_dtype(df[col]):
-                inferred_types[col] = "datetime"
-            elif df[col].nunique() / len(df) < 0.05:
-                inferred_types[col] = "categorical"
-            else:
-                inferred_types[col] = "text"
-
-        # Basic statistics for numeric columns
-        stats = {}
-        for col in df.select_dtypes(include=[np.number]).columns:
-            stats[col] = {
-                "mean": float(df[col].mean()),
-                "std": float(df[col].std()),
-                "min": float(df[col].min()),
-                "max": float(df[col].max()),
-                "25%": float(df[col].quantile(0.25)),
-                "50%": float(df[col].quantile(0.50)),
-                "75%": float(df[col].quantile(0.75))
-            }
-
-        # Preview (first 10 rows)
-        preview = df.head(10).to_dict(orient="records")
-
-        return {
-            "file_id": file_id,
-            "filename": file.filename,
-            "shape": {"rows": rows, "cols": cols},
-            "columns": columns,
-            "preview": preview,
-            "inferred_types": inferred_types,
-            "stats": stats
-        }
+        return _profile_df(df, file.filename)
 
     except Exception as e:
         raise HTTPException(
