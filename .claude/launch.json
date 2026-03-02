@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "HappyModel Frontend",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": [
+        "C:\\Users\\ashay\\source\\repos\\Aditi\\frontend\\node_modules\\vite\\bin\\vite.js",
+        "C:\\Users\\ashay\\source\\repos\\Aditi\\frontend",
+        "--port", "5190"
+      ],
+      "port": 5190
+    }
+  ]
+}
