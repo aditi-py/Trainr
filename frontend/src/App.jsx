@@ -116,7 +116,7 @@ const initialState = {
   model:    { category: '', id: '', name: '', taskType: '' },
   features: { inputs: [], target: '', dateColumn: '' },
   params:   {},
-  split:    { testSize: 0.2, cvFolds: 5, useCv: false },
+  split:    { testSize: 0.2, valSize: 0.1, cvFolds: 5, useCv: false, bootstrap: false },
   results:  { current: null, comparison: [] },
   ui:       { step: 1, darkMode: true, loading: false, error: null, healthOk: true, sidebarOpen: true },
 };
@@ -938,12 +938,55 @@ function StepFeatures({ state, dispatch }) {
     return `rgb(${r}, ${Math.round(255 * (1 - Math.abs(v)))}, ${b})`;
   };
 
+  // Data leakage detection
+  const leakageWarnings = useMemo(() => {
+    const warnings = [];
+    if (!features.target || data.preview.length === 0) return warnings;
+    const nRows = data.preview.length;
+
+    features.inputs.forEach(col => {
+      // Warning 1: near-perfect correlation with target
+      const corr = Math.abs(correlations[col] || 0);
+      if (corr > 0.98) {
+        warnings.push({ col, type: 'highCorr', msg: `"${col}" has correlation ${corr.toFixed(3)} with target — near-perfect correlation is suspicious and may indicate data leakage.` });
+      }
+      // Warning 2: unique count = row count (likely an ID)
+      const uniqueVals = new Set(data.preview.map(r => r[col])).size;
+      if (uniqueVals === nRows) {
+        warnings.push({ col, type: 'idCol', msg: `"${col}" has ${nRows} unique values across ${nRows} rows — likely an ID or index column that should be excluded.` });
+      }
+    });
+    return warnings;
+  }, [features.inputs, features.target, correlations, data.preview]);
+
+  const [dismissedWarnings, setDismissedWarnings] = useState([]);
+  const visibleWarnings = leakageWarnings.filter(w => !dismissedWarnings.includes(w.col + w.type));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: t.text, marginBottom: 6 }}>Configure Features</h2>
         <p style={{ color: t.muted, fontSize: 14 }}>Select input features and the target variable for your model.</p>
       </div>
+
+      {/* Data leakage warnings */}
+      {visibleWarnings.map(w => (
+        <div key={w.col + w.type} style={{
+          background: '#ffaa0015', border: '1px solid #ffaa0055',
+          borderRadius: 8, padding: '10px 14px',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <span style={{ fontSize: 16 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: '#ffaa00', fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
+              {w.type === 'highCorr' ? 'Potential Data Leakage' : 'Possible ID Column'}
+            </p>
+            <p style={{ color: t.muted, fontSize: 12 }}>{w.msg}</p>
+          </div>
+          <button onClick={() => setDismissedWarnings(d => [...d, w.col + w.type])}
+            style={{ background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+        </div>
+      ))}
 
       {/* Smart suggestion */}
       {topCorrelated.length > 0 && (
@@ -1294,8 +1337,10 @@ function StepParams({ state, dispatch }) {
     dispatch({ type: 'SET_PARAMS', payload: { [key]: value } });
   }, [dispatch]);
 
-  const trainRows = Math.round((data.shape.rows || 1000) * (1 - split.testSize));
-  const testRows  = (data.shape.rows || 1000) - trainRows;
+  const totalRows = data.shape.rows || 1000;
+  const testRows  = Math.round(totalRows * split.testSize);
+  const valRows   = Math.round(totalRows * split.valSize);
+  const trainRows = totalRows - testRows - valRows;
 
   const handleTrain = async () => {
     setTraining(true);
@@ -1309,7 +1354,9 @@ function StepParams({ state, dispatch }) {
         target_column:   features.target,
         params,
         test_size:   split.testSize,
+        val_size:    split.valSize,
         cv_folds:    split.useCv ? split.cvFolds : null,
+        bootstrap:   split.bootstrap,
         date_column: features.dateColumn || null,
       };
       const res = await fetch('http://localhost:8000/train', {
@@ -1354,40 +1401,72 @@ function StepParams({ state, dispatch }) {
         <ModelParamForm modelId={model.id} params={params} setParam={setParam} dark={dark} />
       </Card>
 
-      {/* Train/Test Split */}
+      {/* Train / Val / Test Split */}
       <Card dark={dark}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: t.text }}>Train / Test Split</h3>
-          <HelpTip text="Fraction of data reserved for testing model performance." dark={dark} />
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: t.text }}>Data Split</h3>
+          <HelpTip text="Divide data into train, validation, and test sets. Metrics are always reported on the TEST set to prevent data leakage." dark={dark} />
         </div>
+
         <ParamSlider
-          label={`Test Size: ${Math.round(split.testSize * 100)}%`}
+          label={`Test Set: ${Math.round(split.testSize * 100)}%`}
           pkey="testSize" min={0.1} max={0.4} step={0.05}
           value={split.testSize}
-          onChange={(_, v) => dispatch({ type: 'SET_SPLIT', payload: { testSize: v } })}
-          dark={dark}
+          onChange={(_, v) => {
+            const maxVal = Math.max(0, 0.9 - v);
+            dispatch({ type: 'SET_SPLIT', payload: { testSize: v, valSize: Math.min(split.valSize, maxVal) } });
+          }}
+          tooltip="Fraction held out exclusively for final evaluation. Never seen during training." dark={dark}
         />
-        <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-          <div style={{ flex: 1 - split.testSize, background: `${t.accent}22`, border: `1px solid ${t.accent}44`, borderRadius: 6, padding: '8px 12px', textAlign: 'center' }}>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: t.accent }}>{trainRows.toLocaleString()}</p>
-            <p style={{ fontSize: 12, color: t.muted }}>Training rows ({Math.round((1 - split.testSize) * 100)}%)</p>
-          </div>
-          <div style={{ flex: split.testSize, background: `#f59e0b22`, border: `1px solid #f59e0b44`, borderRadius: 6, padding: '8px 12px', textAlign: 'center' }}>
-            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: '#f59e0b' }}>{testRows.toLocaleString()}</p>
-            <p style={{ fontSize: 12, color: t.muted }}>Testing rows ({Math.round(split.testSize * 100)}%)</p>
-          </div>
+        <ParamSlider
+          label={`Validation Set: ${Math.round(split.valSize * 100)}%`}
+          pkey="valSize" min={0.0} max={Math.max(0.05, 0.8 - split.testSize)} step={0.05}
+          value={split.valSize}
+          onChange={(_, v) => dispatch({ type: 'SET_SPLIT', payload: { valSize: v } })}
+          tooltip="Optional set to monitor training progress (e.g. early stopping). Set to 0 to skip." dark={dark}
+        />
+
+        {/* Visual 3-way bar */}
+        <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', margin: '12px 0 10px' }}>
+          <div style={{ flex: trainRows, background: '#00ffd5' }} />
+          <div style={{ flex: valRows,   background: '#ff006e', marginLeft: 2 }} />
+          <div style={{ flex: testRows,  background: '#f59e0b', marginLeft: 2 }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { label: 'Train', rows: trainRows, pct: Math.round((trainRows/totalRows)*100), color: '#00ffd5' },
+            { label: 'Val',   rows: valRows,   pct: Math.round(split.valSize*100),         color: '#ff006e' },
+            { label: 'Test',  rows: testRows,  pct: Math.round(split.testSize*100),        color: '#f59e0b' },
+          ].map(({ label, rows, pct, color }) => (
+            <div key={label} style={{ flex: 1, background: `${color}15`, border: `1px solid ${color}44`, borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 16, fontWeight: 700, color }}>{rows.toLocaleString()}</p>
+              <p style={{ fontSize: 11, color: t.muted }}>{label} ({pct}%)</p>
+            </div>
+          ))}
         </div>
 
         {!isDeep && (
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${t.border}` }}>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <ParamToggle label="Cross-Validation" pkey="useCv" value={split.useCv}
               onChange={(_, v) => dispatch({ type: 'SET_SPLIT', payload: { useCv: v } })}
-              tooltip="Evaluate model stability across multiple data splits." dark={dark} />
+              tooltip="Evaluate stability across multiple folds. Classification uses StratifiedKFold; time-series uses TimeSeriesSplit." dark={dark} />
             {split.useCv && (
-              <ParamSlider label="K Folds" pkey="cvFolds" min={3} max={10} value={split.cvFolds}
-                onChange={(_, v) => dispatch({ type: 'SET_SPLIT', payload: { cvFolds: v } })}
-                tooltip="Number of cross-validation folds." dark={dark} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 8 }}>
+                <span style={{ fontSize: 13, color: t.muted, whiteSpace: 'nowrap' }}>K Folds:</span>
+                {[3, 5, 10].map(k => (
+                  <button key={k} onClick={() => dispatch({ type: 'SET_SPLIT', payload: { cvFolds: k } })}
+                    style={{ padding: '4px 14px', borderRadius: 6, border: `1px solid ${split.cvFolds === k ? t.accent : t.border}`,
+                      background: split.cvFolds === k ? `${t.accent}22` : t.card,
+                      color: split.cvFolds === k ? t.accent : t.muted, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    {k}
+                  </button>
+                ))}
+              </div>
             )}
+            <ParamToggle label="Bootstrap CI (95%)" pkey="bootstrap" value={split.bootstrap}
+              onChange={(_, v) => dispatch({ type: 'SET_SPLIT', payload: { bootstrap: v } })}
+              tooltip="Run 100 bootstrap samples to compute a 95% confidence interval for the primary metric. Adds ~5–10s to training time." dark={dark} />
           </div>
         )}
       </Card>
@@ -1490,6 +1569,7 @@ function StepResults({ state, dispatch }) {
   const t = tok(dark);
   const toast = useToast();
   const current = results.current;
+  const [threshold, setThreshold] = useState(0.5);
 
   if (!current) {
     return (
@@ -1890,12 +1970,32 @@ ${modelCards}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: t.text, marginBottom: 4 }}>Results</h2>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <Badge color={t.accent}>{current.modelName}</Badge>
             {current.training_time != null && (
               <Badge color="#22c55e">Training: {typeof current.training_time === 'number' ? current.training_time.toFixed(2) : current.training_time}s</Badge>
             )}
             <Badge color="#64748b">{new Date(current.timestamp).toLocaleTimeString()}</Badge>
+            {/* Overfitting badge */}
+            {current.train_score != null && current.test_score != null && (() => {
+              const delta = current.train_score - current.test_score;
+              const label = delta < 0.05 ? '🟢 Healthy' : delta < 0.15 ? '🟡 Mild Overfit' : '🔴 Severe Overfit';
+              const color = delta < 0.05 ? '#39ff14' : delta < 0.15 ? '#ffaa00' : '#ff006e';
+              const tip   = delta < 0.05
+                ? 'Train and test scores are close — the model generalises well.'
+                : delta < 0.15
+                ? 'The model performs notably better on training data than unseen data. Consider more regularisation or less model complexity.'
+                : 'Large gap between train and test — the model has memorised the training data. Try regularisation, simpler model, or more data.';
+              return (
+                <span title={tip} style={{ fontSize: 12, fontWeight: 700, color, border: `1px solid ${color}55`,
+                  borderRadius: 6, padding: '2px 8px', cursor: 'help', background: `${color}15` }}>
+                  {label}
+                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8, marginLeft: 6 }}>
+                    (Δ {delta.toFixed(3)})
+                  </span>
+                </span>
+              );
+            })()}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1907,23 +2007,63 @@ ${modelCards}
         </div>
       </div>
 
-      {/* Metric cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
-        {displayMetrics.map(k => <MetricCard key={k} mkey={k} value={metrics[k]} dark={dark} />)}
+      {/* Train vs Test score row */}
+      {current.train_score != null && current.test_score != null && (
+        <div style={{ display: 'flex', gap: 12 }}>
+          {[
+            { label: 'Train Score', value: current.train_score, color: '#00ffd5' },
+            { label: 'Test Score',  value: current.test_score,  color: '#f59e0b' },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ flex: 1, background: `${color}12`, border: `1px solid ${color}44`,
+              borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</p>
+              <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 700, color }}>
+                {value.toFixed(4)}
+              </p>
+              <p style={{ fontSize: 10, color: t.muted, marginTop: 2 }}>
+                {taskType === 'regression' ? 'R²' : 'Accuracy'} on {label.includes('Train') ? 'training' : 'test'} set
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Metric cards — evaluated on TEST set */}
+      <div>
+        <p style={{ fontSize: 11, color: t.muted, marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          All metrics evaluated on TEST set
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+          {displayMetrics.map(k => <MetricCard key={k} mkey={k} value={metrics[k]} dark={dark} />)}
+        </div>
       </div>
+
+      {/* Bootstrap CI */}
+      {current.bootstrap_ci && (
+        <div style={{ background: `#4361ee18`, border: `1px solid #4361ee44`, borderRadius: 8, padding: '10px 16px', fontSize: 13 }}>
+          <span style={{ color: '#8b9cf7', fontWeight: 700 }}>Bootstrap CI (95%): </span>
+          <span style={{ fontFamily: 'DM Mono, monospace', color: t.text }}>
+            {current.bootstrap_ci.metric.toUpperCase()} = {current.bootstrap_ci.mean.toFixed(4)} ± {current.bootstrap_ci.std.toFixed(4)}
+            {'  '}
+            <span style={{ color: '#8b9cf7' }}>({current.bootstrap_ci.ci_lo.toFixed(4)} – {current.bootstrap_ci.ci_hi.toFixed(4)})</span>
+          </span>
+          <span style={{ color: t.muted, marginLeft: 12, fontSize: 11 }}>Bootstrap n={current.bootstrap_ci.n}</span>
+        </div>
+      )}
 
       {/* Cross-Validation scores */}
       {current.cv_scores && Object.keys(current.cv_scores).length > 0 && (
         <Card dark={dark}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div>
-              <h4 style={{ fontSize: 13, fontWeight: 700, color: t.text, margin: 0 }}>5-Fold Cross-Validation</h4>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: t.text, margin: 0 }}>{current.cv_k || 5}-Fold Cross-Validation</h4>
               <p style={{ fontSize: 11, color: t.muted, marginTop: 3 }}>
-                Each metric is scored across 5 independent folds — more reliable than a single train/test split.
+                Each metric scored across {current.cv_k || 5} independent folds.
+                {taskType === 'classification' ? ' Uses StratifiedKFold to preserve class balance.' : ''}
               </p>
             </div>
             <span style={{ fontSize: 11, color: t.accent, fontFamily: 'Share Tech Mono, monospace', border: `1px solid ${t.accent}44`, padding: '2px 8px', borderRadius: 4 }}>
-              cv=5
+              cv={current.cv_k || 5}
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2109,6 +2249,91 @@ ${modelCards}
             </div>
           </Card>
         )}
+
+        {/* Threshold Tuner — classification with probabilities only */}
+        {taskType === 'classification' && Array.isArray(current.y_prob) &&
+          current.y_prob.length > 0 && typeof current.y_prob[0] === 'number' && (() => {
+          // Recompute confusion values at current threshold
+          const yTrue = current.y_test || [];
+          const yProb = current.y_prob || [];
+          let tp = 0, fp = 0, fn = 0, tn = 0;
+          yTrue.forEach((actual, i) => {
+            const pred = yProb[i] >= threshold ? 1 : 0;
+            if (actual === 1 && pred === 1) tp++;
+            else if (actual === 0 && pred === 1) fp++;
+            else if (actual === 1 && pred === 0) fn++;
+            else tn++;
+          });
+          const prec = tp + fp > 0 ? tp / (tp + fp) : 0;
+          const rec  = tp + fn > 0 ? tp / (tp + fn) : 0;
+          const f1t  = prec + rec > 0 ? 2 * prec * rec / (prec + rec) : 0;
+          const acc  = yTrue.length > 0 ? (tp + tn) / yTrue.length : 0;
+          // PR curve preview (sample 20 thresholds)
+          const prCurve = Array.from({ length: 21 }, (_, i) => {
+            const thr = i / 20;
+            let tp2 = 0, fp2 = 0, fn2 = 0;
+            yTrue.forEach((a, j) => {
+              const p = yProb[j] >= thr ? 1 : 0;
+              if (a === 1 && p === 1) tp2++;
+              else if (a === 0 && p === 1) fp2++;
+              else if (a === 1 && p === 0) fn2++;
+            });
+            const p2 = tp2 + fp2 > 0 ? tp2 / (tp2 + fp2) : 1;
+            const r2 = tp2 + fn2 > 0 ? tp2 / (tp2 + fn2) : 0;
+            return { x: Math.round(thr * 100), prec: Math.round(p2 * 100), recall: Math.round(r2 * 100) };
+          });
+          return (
+            <Card dark={dark} style={{ gridColumn: 'span 2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Threshold Tuner</h4>
+                <HelpTip text="Lower threshold = more positives detected (higher recall). Higher threshold = fewer false alarms (higher precision)." dark={dark} />
+              </div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                {/* Left: slider + live metrics */}
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, color: t.muted }}>Threshold:</span>
+                    <input type="range" min="0.01" max="0.99" step="0.01" value={threshold}
+                      onChange={e => setThreshold(parseFloat(e.target.value))}
+                      style={{ flex: 1 }} />
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, color: t.accent, minWidth: 36 }}>
+                      {threshold.toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {[['Precision', prec], ['Recall', rec], ['F1', f1t], ['Accuracy', acc]].map(([label, val]) => {
+                      const c = val >= 0.8 ? '#39ff14' : val >= 0.6 ? '#00ffd5' : val >= 0.4 ? '#ffaa00' : '#ff006e';
+                      return (
+                        <div key={label} style={{ background: `${c}10`, border: `1px solid ${c}44`, borderRadius: 6, padding: '6px 10px' }}>
+                          <p style={{ fontSize: 10, color: t.muted, textTransform: 'uppercase', fontWeight: 600 }}>{label}</p>
+                          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 16, fontWeight: 700, color: c }}>{val.toFixed(3)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8, fontSize: 11, color: t.muted }}>
+                    <div>TP: <strong style={{ color: '#39ff14' }}>{tp}</strong>  FP: <strong style={{ color: '#ff006e' }}>{fp}</strong></div>
+                    <div>FN: <strong style={{ color: '#ffaa00' }}>{fn}</strong>  TN: <strong style={{ color: t.accent }}>{tn}</strong></div>
+                  </div>
+                </div>
+                {/* Right: PR mini chart */}
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>Precision–Recall vs Threshold</p>
+                  <ResponsiveContainer width="100%" height={100}>
+                    <LineChart data={prCurve} margin={{ top: 2, right: 4, bottom: 2, left: 0 }}>
+                      <XAxis dataKey="x" tick={{ fill: t.muted, fontSize: 9 }} label={{ value: 'Threshold %', position: 'insideBottom', fill: t.muted, fontSize: 9, dy: 8 }} />
+                      <YAxis domain={[0, 100]} tick={{ fill: t.muted, fontSize: 9 }} />
+                      <Tooltip contentStyle={{ background: t.card, border: `1px solid ${t.border}`, fontSize: 10 }}
+                        formatter={v => `${v}%`} />
+                      <Line type="monotone" dataKey="prec" stroke="#00ffd5" dot={false} strokeWidth={1.5} name="Precision" />
+                      <Line type="monotone" dataKey="recall" stroke="#ff006e" dot={false} strokeWidth={1.5} name="Recall" strokeDasharray="4 2" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* Regression Metrics Display */}
         {taskType === 'regression' && (

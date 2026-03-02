@@ -14,7 +14,10 @@ import pandas as pd
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sklearn.model_selection import train_test_split, cross_val_score, KFold, learning_curve as sk_learning_curve
+from sklearn.model_selection import (
+    train_test_split, cross_val_score, KFold, StratifiedKFold,
+    TimeSeriesSplit, learning_curve as sk_learning_curve
+)
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
     mean_absolute_error, mean_squared_error, mean_absolute_percentage_error, r2_score,
@@ -411,7 +414,9 @@ async def train(request_body: Dict[str, Any]):
         feature_columns = request_body.get("feature_columns", [])
         params = request_body.get("params", {})
         test_size = request_body.get("test_size", 0.2)
+        val_size = request_body.get("val_size", 0.0)      # 0 = no explicit val set
         cv_folds = request_body.get("cv_folds", None)
+        bootstrap = request_body.get("bootstrap", False)
 
         # Validate
         if file_id not in SESSIONS:
@@ -487,10 +492,22 @@ async def train(request_body: Dict[str, Any]):
         else:
             y = df_processed[target_column].values
 
-            # Train/test split
-            X_train, X_test, y_train, y_test = train_test_split(
+            # ── 3-way split: train / val / test ──────────────────────────────
+            # First carve out the test set
+            X_tv, X_test, y_tv, y_test = train_test_split(
                 X, y, test_size=test_size, random_state=42
             )
+            # Then optionally carve out a validation set from the train pool
+            if val_size and val_size > 0:
+                # val_size is a fraction of the ORIGINAL data; adjust relative to tv pool
+                val_frac = val_size / (1.0 - test_size)
+                val_frac = min(max(val_frac, 0.05), 0.5)   # clamp to sane range
+                X_train, X_val, y_train, y_val = train_test_split(
+                    X_tv, y_tv, test_size=val_frac, random_state=42
+                )
+            else:
+                X_train, y_train = X_tv, y_tv
+                X_val,  y_val    = X_test, y_test   # fall back to test for val display
 
             # Get and train model
             n_features = X_train.shape[1]
@@ -543,8 +560,29 @@ async def train(request_body: Dict[str, Any]):
                 training_time = time.time() - start_time
                 y_pred = model.predict(X_test)
 
+            # ── Train score (for overfitting detection) ───────────────────────
+            try:
+                if is_dl:
+                    X_tr_dl = X_train.reshape((X_train.shape[0], 1, X_train.shape[1])) \
+                              if model_type in ("lstm", "cnn_1d") else X_train
+                    y_train_pred = model.predict(X_tr_dl, verbose=0).flatten()
+                    if task_type == "classification":
+                        y_train_pred = (y_train_pred > 0.5).astype(int)
+                else:
+                    y_train_pred = model.predict(X_train)
+
+                if task_type == "regression":
+                    train_score = float(r2_score(y_train, y_train_pred))
+                    test_score  = float(r2_score(y_test,  y_pred))
+                else:
+                    train_score = float(accuracy_score(y_train, y_train_pred))
+                    test_score  = float(accuracy_score(y_test,
+                                    (y_pred > 0.5).astype(int) if is_dl else y_pred))
+            except Exception:
+                train_score, test_score = None, None
+
             if task_type == "regression":
-                # Regression metrics
+                # Regression metrics (on TEST set)
                 mae = mean_absolute_error(y_test, y_pred)
                 mse = mean_squared_error(y_test, y_pred)
                 rmse = np.sqrt(mse)
@@ -556,6 +594,8 @@ async def train(request_body: Dict[str, Any]):
                     "model_type": model_type,
                     "task_type": "regression",
                     "training_time_seconds": training_time,
+                    "train_score": train_score,
+                    "test_score":  test_score,
                     "metrics": {
                         "mae": float(mae),
                         "mse": float(mse),
@@ -607,6 +647,8 @@ async def train(request_body: Dict[str, Any]):
                     "model_type": model_type,
                     "task_type": "classification",
                     "training_time_seconds": training_time,
+                    "train_score": train_score,
+                    "test_score":  test_score,
                     "metrics": {
                         "accuracy": float(accuracy),
                         "precision": float(precision),
@@ -679,11 +721,19 @@ async def train(request_body: Dict[str, Any]):
                 except Exception:
                     pass  # Learning curve is optional — never fail the main response
 
-            # ── Cross-Validation (5-fold) ─────────────────────────────────────
+            # ── Cross-Validation ──────────────────────────────────────────────
             if not is_dl:
                 try:
                     cv_metrics = {}
-                    cv_folds   = 5
+                    k = int(cv_folds) if cv_folds else 5
+
+                    # Choose splitter based on task type
+                    if task_type == "time_series":
+                        cv_splitter = TimeSeriesSplit(n_splits=k)
+                    elif task_type == "classification":
+                        cv_splitter = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+                    else:
+                        cv_splitter = KFold(n_splits=k, shuffle=True, random_state=42)
 
                     if task_type == "regression":
                         for sk_scoring, label in [
@@ -693,7 +743,7 @@ async def train(request_body: Dict[str, Any]):
                         ]:
                             cv_s = cross_val_score(
                                 get_model(model_type, params, task_type, n_features=n_features),
-                                X, y, cv=cv_folds, scoring=sk_scoring,
+                                X, y, cv=cv_splitter, scoring=sk_scoring,
                                 n_jobs=1, error_score=0.0,
                             )
                             if sk_scoring.startswith("neg_"):
@@ -704,7 +754,7 @@ async def train(request_body: Dict[str, Any]):
                                 "scores": [round(float(s), 4) for s in cv_s],
                             }
 
-                    else:  # classification
+                    elif task_type == "classification":
                         for sk_scoring, label in [
                             ("accuracy",           "accuracy"),
                             ("f1_weighted",        "f1"),
@@ -713,7 +763,7 @@ async def train(request_body: Dict[str, Any]):
                         ]:
                             cv_s = cross_val_score(
                                 get_model(model_type, params, task_type, n_features=n_features),
-                                X, y, cv=cv_folds, scoring=sk_scoring,
+                                X, y, cv=cv_splitter, scoring=sk_scoring,
                                 n_jobs=1, error_score=0.0,
                             )
                             cv_metrics[label] = {
@@ -724,8 +774,39 @@ async def train(request_body: Dict[str, Any]):
 
                     if cv_metrics:
                         result["cv_scores"] = cv_metrics
+                        result["cv_k"] = k
                 except Exception:
-                    pass  # CV is optional — never fail the main response
+                    pass  # CV is optional
+
+            # ── Bootstrap Confidence Intervals ────────────────────────────────
+            if bootstrap and not is_dl:
+                try:
+                    rng = np.random.default_rng(42)
+                    n_boot = 100
+                    boot_scores = []
+                    is_reg = (task_type == "regression")
+                    for _ in range(n_boot):
+                        idx = rng.integers(0, len(X_test), size=len(X_test))
+                        Xb, yb = X_test[idx], y_test[idx]
+                        pb = model.predict(Xb)
+                        if is_reg:
+                            boot_scores.append(float(r2_score(yb, pb)))
+                        else:
+                            pb_cls = (pb > 0.5).astype(int) if is_dl else pb
+                            boot_scores.append(float(accuracy_score(yb, pb_cls)))
+                    boot_scores = np.array(boot_scores)
+                    ci_lo = float(np.percentile(boot_scores, 2.5))
+                    ci_hi = float(np.percentile(boot_scores, 97.5))
+                    result["bootstrap_ci"] = {
+                        "mean":    round(float(boot_scores.mean()), 4),
+                        "std":     round(float(boot_scores.std()),  4),
+                        "ci_lo":   round(ci_lo, 4),
+                        "ci_hi":   round(ci_hi, 4),
+                        "n":       n_boot,
+                        "metric":  "r2" if is_reg else "accuracy",
+                    }
+                except Exception:
+                    pass  # Bootstrap is optional
 
             return result
 
