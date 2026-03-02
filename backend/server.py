@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sklearn.model_selection import train_test_split, cross_val_score, KFold
+from sklearn.model_selection import train_test_split, cross_val_score, KFold, learning_curve as sk_learning_curve
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
     mean_absolute_error, mean_squared_error, mean_absolute_percentage_error, r2_score,
@@ -484,6 +484,55 @@ async def train(request_body: Dict[str, Any]):
                 importances = model.feature_importances_.tolist()
                 feature_importance = {feat: imp for feat, imp in zip(feature_columns, importances)}
                 result["feature_importances"] = feature_importance
+
+            # ── Learning / Validation Curve ──────────────────────────────────
+            try:
+                lc_data    = []
+                lc_x_label = "Training Samples"
+                is_reg     = (task_type == "regression")
+                score_fn   = r2_score if is_reg else accuracy_score
+                cls_name   = type(model).__name__
+
+                if cls_name in ("GradientBoostingRegressor", "GradientBoostingClassifier"):
+                    # staged_predict: already trained, O(n_estimators) predictions only
+                    lc_x_label = "Estimators"
+                    n_est      = model.n_estimators
+                    step       = max(1, n_est // 20)
+                    tr_preds   = list(model.staged_predict(X_train))
+                    va_preds   = list(model.staged_predict(X_test))
+                    for i in range(step - 1, n_est, step):
+                        lc_data.append({
+                            "x":           i + 1,
+                            "train_score": round(float(score_fn(y_train, tr_preds[i])), 4),
+                            "val_score":   round(float(score_fn(y_test,  va_preds[i])), 4),
+                        })
+
+                else:
+                    # Generic sklearn learning curve — works for every estimator
+                    scoring  = "r2" if is_reg else "accuracy"
+                    n_total  = len(X)
+                    n_pts    = 6 if n_total >= 300 else max(3, n_total // 50)
+                    ts, tr_sc, va_sc = sk_learning_curve(
+                        get_model(model_type, params, task_type),
+                        X, y,
+                        train_sizes=np.linspace(0.15, 1.0, n_pts),
+                        cv=3,
+                        scoring=scoring,
+                        n_jobs=1,
+                        error_score=0.0,
+                    )
+                    for size, tr, va in zip(ts, tr_sc.mean(axis=1), va_sc.mean(axis=1)):
+                        lc_data.append({
+                            "x":           int(size),
+                            "train_score": round(float(tr), 4),
+                            "val_score":   round(float(va), 4),
+                        })
+
+                if lc_data:
+                    result["learning_curve"]         = lc_data
+                    result["learning_curve_x_label"] = lc_x_label
+            except Exception:
+                pass  # Learning curve is optional — never fail the main response
 
             return result
 

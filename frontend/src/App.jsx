@@ -815,14 +815,35 @@ function StepModel({ state, dispatch }) {
 
   const TABS = Object.keys(MODEL_CATALOG);
 
-  // Recommendation logic
+  // Recommendation logic — per-category, data-aware
   const hasDatetime = Object.values(data.types || {}).some(v => v === 'datetime');
-  const recommendation = useMemo(() => {
-    if (hasDatetime) return 'arima';
-    const numericCols = Object.entries(data.types || {}).filter(([, v]) => v === 'numeric').map(([k]) => k);
-    if (numericCols.length > 0) return 'xgboost_regressor';
-    return 'kmeans';
-  }, [data.types, hasDatetime]);
+
+  // Per-category best model keyed by tab name, based on dataset shape
+  const recommendations = useMemo(() => {
+    const rows     = data.shape?.rows || 0;
+    const types    = data.types || {};
+    const numCols  = Object.values(types).filter(v => v === 'numeric').length;
+    const colCount = Object.keys(types).length;
+
+    if (hasDatetime)   return { Statistical: 'arima' };
+    if (numCols === 0) return { Clustering: 'kmeans' };
+
+    let reg, cls;
+    if      (rows < 500)   { reg = 'ridge';                       cls = 'logistic_regression';        }
+    else if (rows < 5000)  { reg = 'random_forest_regressor';     cls = 'random_forest_classifier';   }
+    else if (rows < 20000) { reg = 'gradient_boosting_regressor'; cls = 'gradient_boosting_classifier';}
+    else                   { reg = 'xgboost_regressor';           cls = 'xgboost_classifier';         }
+
+    // High-dimensional sparse data → regularised linear handles it better
+    if (colCount > 30 && rows < 2000) { reg = 'lasso'; cls = 'logistic_regression'; }
+
+    return { Regression: reg, Classification: cls, Clustering: 'kmeans' };
+  }, [data.shape, data.types, hasDatetime]);
+
+  // Single model id for the banner: use the recommended-tab's suggestion
+  const recommendation = useMemo(() => (
+    recommendations[recommendedTab] || Object.values(recommendations)[0] || null
+  ), [recommendations, recommendedTab]);
 
   const recommendedTab = useMemo(() => {
     if (hasDatetime) return 'Statistical';
@@ -890,7 +911,7 @@ function StepModel({ state, dispatch }) {
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
           {(MODEL_CATALOG[activeTab] || []).map(m => {
             const selected = model.id === m.id;
-            const isRec    = m.id === recommendation;
+            const isRec    = m.id === (recommendations[activeTab] ?? recommendation);
             return (
               <div key={m.id} onClick={() => selectModel(m, activeTab)} style={{
                 background: t.card, border: `2px solid ${selected ? t.accent : t.border}`,
@@ -1867,11 +1888,13 @@ ${modelCards}
     toast('Comparison report exported!', 'success');
   } catch(err) { toast('Export failed: ' + err.message, 'error'); } };
 
-  const actual_vs_predicted = current.actual_vs_predicted || [];
+  const actual_vs_predicted  = current.actual_vs_predicted || [];
   const residuals            = current.residuals || [];
   const feature_importances  = current.feature_importances || [];
   const roc_curve            = current.roc_curve || [];
   const pca_2d               = current.pca_2d || [];
+  const learning_curve       = current.learning_curve || [];
+  const lc_x_label           = current.learning_curve_x_label || 'Training Samples';
 
   const residualBuckets = useMemo(() => {
     if (!residuals.length) return [];
@@ -2002,6 +2025,38 @@ ${modelCards}
                 <Tooltip contentStyle={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12 }} />
                 <Bar dataKey="importance" fill="#ff006e" radius={[0, 3, 3, 0]} />
               </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
+
+        {/* Learning / Validation Curve */}
+        {learning_curve.length > 0 && (
+          <Card dark={dark} style={{ gridColumn: 'span 2' }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>
+              Training vs Validation Curve
+            </h4>
+            <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>
+              {lc_x_label === 'Estimators'
+                ? 'Score per boosting round — if val score plateaus or drops while train score rises, the model is overfitting.'
+                : 'Score vs training set size — if both scores are low the model underfit; a large gap means it overfit.'}
+            </p>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={learning_curve} margin={{ top: 4, right: 16, bottom: 20, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={t.border} />
+                <XAxis
+                  dataKey="x"
+                  tick={{ fill: t.muted, fontSize: 11 }}
+                  label={{ value: lc_x_label, position: 'insideBottom', fill: t.muted, fontSize: 11, dy: 14 }}
+                />
+                <YAxis domain={['auto', 'auto']} tick={{ fill: t.muted, fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12 }}
+                  formatter={(v) => [typeof v === 'number' ? v.toFixed(4) : v]}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Line type="monotone" dataKey="train_score" stroke="#00ffd5" dot={false} strokeWidth={2} name="Train" />
+                <Line type="monotone" dataKey="val_score"   stroke="#ff006e" dot={false} strokeWidth={2} name="Validation" strokeDasharray="5 5" />
+              </LineChart>
             </ResponsiveContainer>
           </Card>
         )}
