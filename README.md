@@ -9,10 +9,10 @@ A complete no-code machine learning tool. Upload a dataset, pick a model, config
 HappyModel guides you through the full ML lifecycle in 5 steps:
 
 1. **Import Data** — Drag-and-drop or browse for a file (CSV, Excel, Parquet, JSON, TXT). An automatic data profile shows row/column counts, column types, null percentages, and a preview of the first few rows.
-2. **Select Model** — Choose from 30+ models across regression, classification, time series, clustering, and deep learning. A quick-filter bar and category tabs help narrow options.
+2. **Select Model** — Choose from 30+ models across regression, classification, time series, clustering, and deep learning. A quick-filter bar and category tabs help narrow options. A smart recommendation banner suggests the best model based on your dataset's size and shape.
 3. **Configure Features** — Select the target column and input features. A correlation heatmap highlights relationships. Features can be toggled individually or in bulk.
 4. **Set Parameters** — Tune hyperparameters with sliders and dropdowns. Quick presets (Conservative / Balanced / Aggressive) apply sensible defaults with one click. Every parameter has a plain-English tooltip.
-5. **View Results** — Explore performance metrics, feature importance charts, actual-vs-predicted scatter plots, residual plots, confusion matrices (classification), ROC curves, PCA cluster views, and training time. Add up to 3 models to a side-by-side comparison panel. Export a single-model HTML report or a full comparison report.
+5. **View Results** — Explore performance metrics, feature importance charts, actual-vs-predicted scatter plots, residual plots, confusion matrices (classification), ROC curves, PCA cluster views, training/validation learning curves, 5-fold cross-validation scores, and training time. Add up to 3 models to a side-by-side comparison panel. Export a single-model HTML report or a full comparison report.
 
 ---
 
@@ -30,13 +30,15 @@ cd backend
 pip install -r requirements.txt
 ```
 
-### 2 — Start the backend
+### 2 — Start the backend (keep this terminal open)
 
 ```bash
 python server.py
 ```
 
 The FastAPI backend starts at `http://localhost:8000`. A health-check endpoint is available at `http://localhost:8000/health`.
+
+> **Important:** The backend must be running before you upload a file. The app polls the backend every 5 seconds and shows a red banner + a hint above the Next Step button if it is unreachable.
 
 ### 3 — Start the frontend
 
@@ -46,11 +48,11 @@ npm install
 npm run dev
 ```
 
-The React dev server starts at `http://localhost:5173`.
+The React dev server starts at `http://localhost:5190`.
 
 ### 4 — Open the app
 
-Navigate to `http://localhost:5173` in your browser.
+Navigate to `http://localhost:5190` in your browser.
 
 ---
 
@@ -136,6 +138,16 @@ Deep learning models are skipped gracefully if TensorFlow is not installed.
 - Drag-and-drop zone or file picker (format-specific filters)
 - Automatic data profiling: shape, column types, null counts, numeric ranges
 - Preview of the first 5 rows
+- Backend health polled every 5 seconds; red banner + button hint shown when unreachable
+
+### Smart Recommendations
+- Per-category model recommendation based on dataset rows and column count
+- `< 500 rows` → Ridge / Logistic Regression
+- `500–5k rows` → Random Forest
+- `5k–20k rows` → Gradient Boosting
+- `> 20k rows` → XGBoost
+- `> 30 columns & < 2k rows` → Lasso / Logistic Regression (high-dimensional)
+- Datetime column detected → ARIMA (Statistical tab)
 
 ### Model Training
 - Session-based: each browser tab gets its own UUID session
@@ -147,6 +159,8 @@ Deep learning models are skipped gracefully if TensorFlow is not installed.
 - **Classification**: Accuracy, Precision, Recall, F1, AUC-ROC; confusion matrix; ROC curve; feature importances
 - **Clustering**: Silhouette score, number of clusters; PCA 2D cluster scatter plot
 - **Time Series**: MSE, RMSE, MAE; actual vs predicted line chart
+- **Training/Validation Curve**: learning curve showing train vs validation score over training size (or boosting rounds for GradientBoosting via `staged_predict`)
+- **5-Fold Cross-Validation**: mean ± std per metric with per-fold colour-coded bars
 
 ### Model Comparison
 - Pin up to 3 trained models to the comparison panel
@@ -154,7 +168,7 @@ Deep learning models are skipped gracefully if TensorFlow is not installed.
 - Per-model parameter, feature importance, and data tables in the comparison export
 
 ### Export
-- **Single-model HTML report**: overview, metrics, hyperparameters, feature configuration, and appendix tables (feature importances, actual vs predicted, residuals, ROC data, PCA data). Captions accurately reflect how many rows are shown vs total.
+- **Single-model HTML report**: overview, metrics, hyperparameters, feature configuration, and appendix tables. Row counts in captions accurately reflect shown vs total (e.g. "Showing top 20 of 45 features").
 - **Comparison HTML report**: side-by-side metrics + per-model detail cards; best metric value highlighted.
 - **JSON snapshot**: raw result object saved locally.
 
@@ -166,6 +180,7 @@ Deep learning models are skipped gracefully if TensorFlow is not installed.
 - Light / dark mode toggle (persisted in localStorage)
 - Toast notifications (success / error / info) with auto-dismiss
 - Step-based Navbar and collapsible Sidebar with progress indicators
+- Contextual hint above the Next Step button explains why it is disabled
 - Keyboard-friendly — all controls accessible
 
 ---
@@ -194,10 +209,11 @@ Deep learning models are skipped gracefully if TensorFlow is not installed.
 - **Styling**: 100% inline styles; design token object `t` derived from dark/light mode flag
 - **Key components**:
   - `StepImport` — file upload, drag-and-drop, data profile card
-  - `StepModel` — model picker with category tabs and quick-filter
+  - `StepModel` — model picker with category tabs, smart recommendation banner
   - `StepFeatures` — feature selector and correlation heatmap
   - `StepParams` — hyperparameter form with presets and tooltips
-  - `StepResults` — metric cards, all chart panels, comparison table, export buttons
+  - `StepResults` — metric cards, all chart panels, learning curve, CV scores, comparison table, export buttons
+  - `BottomBar` — sticky navigation bar with contextual disabled-button hints
   - `CyberIcon` — inline SVG icon component (9 icons)
   - `CyberpunkBackground` — matrix rain canvas animation
   - `Navbar` / `Sidebar` — step navigation with progress state
@@ -249,7 +265,7 @@ Aditi/
 | Service | Default URL | Config location |
 |---------|------------|----------------|
 | Backend | `http://localhost:8000` | Top of `backend/server.py` |
-| Frontend | `http://localhost:5173` | `frontend/vite.config.js` |
+| Frontend | `http://localhost:5190` | `frontend/vite.config.js` |
 
 ### CORS
 The backend allows requests from `localhost:3000`, `localhost:5173`, and all origins (`*`) for development. Restrict `*` for production deployment.
@@ -268,12 +284,25 @@ Without it the app works fully; only MLP, LSTM, CNN-1D, and Autoencoder are unav
 - Check Python version: `python --version` (need 3.8+)
 - Install deps: `pip install -r backend/requirements.txt`
 - Check port conflict: `netstat -ano | findstr :8000` (Windows) or `lsof -i :8000` (macOS/Linux)
-- The app shows a red banner at the top if the backend is unreachable
+- The app shows a red banner at the top if the backend is unreachable; it polls every 5 seconds and clears automatically once the backend is up
+
+### "Failed to fetch" on file upload
+- The backend is not running. Start it: `cd backend && python server.py`
+- After starting, the red banner will disappear within 5 seconds — no page reload needed
+- Re-select and upload your file; the previous failed upload is not retained
+
+### Next Step button is disabled
+- A magenta hint above the button explains why:
+  - `↑ Start the backend first` — backend is not running
+  - `↑ Upload a file to continue` — no file uploaded yet
+  - `↑ Select a model to continue` — on step 2
+  - `↑ Choose a target column and at least one feature` — on step 3
+- On step 4 (Set Parameters), training itself advances to step 5
 
 ### Frontend shows blank page
-- Ensure backend is running first
-- Open browser DevTools (F12) → Console tab for errors
-- Try a hard refresh: Ctrl+Shift+R
+- Ensure backend is running
+- Hard refresh: `Ctrl+Shift+R`
+- Open DevTools (F12) → Console for errors
 
 ### File upload fails
 - Confirm the file matches a supported format/extension
