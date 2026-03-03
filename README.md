@@ -455,7 +455,7 @@ All encoders, the fitted scaler, and feature statistics (min, max, mean per colu
 ## Project Structure
 
 ```
-Aditi/
+Trainr/
 +-- backend/
 |   +-- server.py            # FastAPI application (single file)
 |   +-- requirements.txt     # Python dependencies
