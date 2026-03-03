@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "HappyModel Frontend",
+      "name": "Trainr Frontend",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": [
         "C:\\Users\\ashay\\source\\repos\\Aditi\\frontend\\node_modules\\vite\\bin\\vite.js",

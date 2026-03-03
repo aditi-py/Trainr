@@ -1,12 +1,12 @@
-# HappyModel
+# Trainr
 
 A complete no-code machine learning tool. Upload a dataset, pick a model, configure it, train it, and compare results, all without writing a single line of code.
 
 ---
 
-## What is HappyModel?
+## What is Trainr?
 
-HappyModel guides you through the full ML lifecycle in 5 steps:
+Trainr guides you through the full ML lifecycle in 5 steps:
 
 1. **Import Data**: Drag-and-drop or browse for a file (CSV, Excel, Parquet, JSON, TXT). An automatic data profile shows row/column counts, inferred types, null percentages, and a preview of the first rows.
 2. **Select Model**: Choose from 30+ models across regression, classification, time series, clustering, and deep learning. Browse by category and read each model's description and complexity rating.

@@ -1,4 +1,4 @@
-# HappyModel API Specification
+# Trainr API Specification
 
 ## Base URL
 ```

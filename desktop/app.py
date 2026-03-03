@@ -1,5 +1,5 @@
 """
-HappyModel — Cyberpunk ML Studio
+Trainr — Cyberpunk ML Studio
 A no-code machine learning desktop application built with PyQt5.
 Connects to the FastAPI backend at http://localhost:8000
 """
@@ -1828,7 +1828,7 @@ class StepResults(QWidget):
         r = self.state.get('results', {})
         if not r:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Save Results", f"happymodel_results_{r.get('modelId', 'model')}.json", "JSON (*.json)")
+        path, _ = QFileDialog.getSaveFileName(self, "Save Results", f"trainr_results_{r.get('modelId', 'model')}.json", "JSON (*.json)")
         if path:
             save_data = {k: v for k, v in r.items()}
             # Convert numpy types
@@ -1849,7 +1849,7 @@ class StepResults(QWidget):
 # ═══════════════════════════════════════════════════════════
 # MAIN WINDOW
 # ═══════════════════════════════════════════════════════════
-class HappyModelApp(QMainWindow):
+class TrainrApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.state = {
@@ -1880,7 +1880,7 @@ class HappyModelApp(QMainWindow):
             self.corners.setGeometry(0, 0, self.width(), self.height())
 
     def init_ui(self):
-        self.setWindowTitle("HappyModel — Cyberpunk ML Studio")
+        self.setWindowTitle("Trainr — Cyberpunk ML Studio")
         self.setMinimumSize(1200, 800)
         self.resize(1300, 850)
 
@@ -2096,7 +2096,7 @@ def main():
     palette.setColor(QPalette.HighlightedText, QColor(C['bg']))
     app.setPalette(palette)
 
-    window = HappyModelApp()
+    window = TrainrApp()
     window.show()
     sys.exit(app.exec_())
 

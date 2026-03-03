@@ -1,4 +1,4 @@
-# HappyModel - Supported Models Reference
+# Trainr - Supported Models Reference
 
 ## Regression Models (7 total)
 

@@ -1,5 +1,5 @@
 """
-HappyModel Backend - FastAPI Server
+Trainr Backend - FastAPI Server
 A no-code machine learning modeling tool
 """
 
@@ -65,7 +65,7 @@ except ImportError:
 # FastAPI Setup
 # ============================================================================
 
-app = FastAPI(title="HappyModel", version="1.0.0")
+app = FastAPI(title="Trainr", version="1.0.0")
 
 # CORS Configuration
 app.add_middleware(

@@ -1,4 +1,4 @@
-# HappyModel – Setup Guide
+# Trainr – Setup Guide
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@
 ### Terminal 1 — Backend
 
 ```bash
-cd happy-model/backend
+cd trainr/backend
 pip install -r requirements.txt
 python server.py
 ```
@@ -30,7 +30,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 ### Terminal 2 — Frontend
 
 ```bash
-cd happy-model/frontend
+cd trainr/frontend
 npm install
 npm run dev
 ```
@@ -50,7 +50,7 @@ Open your browser at **http://localhost:5173**
 1. Visit `http://localhost:8000/health` in your browser
    - Should return: `{"status": "ok"}`
 2. Visit `http://localhost:5173`
-   - Should show HappyModel with a green health status
+   - Should show Trainr with a green health status
    - If you see "Backend not running" banner → make sure Terminal 1 is running
 
 ---
@@ -131,7 +131,7 @@ pip install xgboost --no-binary xgboost
 ## Project Structure
 
 ```
-happy-model/
+trainr/
 ├── backend/
 │   ├── server.py           # Run this first
 │   ├── requirements.txt

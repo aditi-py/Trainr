@@ -1,3 +1,3 @@
 #!/bin/bash
-echo "Starting HappyModel backend..."
+echo "Starting Trainr backend..."
 python server.py
